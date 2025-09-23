@@ -16,6 +16,10 @@ limitations under the License.
 
 package flavorassigner
 
+import (
+	"fmt"
+)
+
 type podSetGroups struct {
 	psGroups       map[string][]indexedPodSet
 	insertionOrder []string
@@ -41,4 +45,13 @@ func (om *podSetGroups) orderedPodSetGroups() [][]indexedPodSet {
 		orderedPodSetGroups[i] = om.psGroups[key]
 	}
 	return orderedPodSetGroups
+}
+
+func (om *podSetGroups) validate() error {
+	for groupName, podSets := range om.psGroups {
+		if groupSize := len(podSets); groupSize > 2 {
+			return fmt.Errorf("PodSet group '%s' consists of %d PodSets, but at most 2 are allowed.", groupName, groupSize)
+		}
+	}
+	return nil
 }
