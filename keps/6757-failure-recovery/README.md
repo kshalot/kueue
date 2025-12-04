@@ -77,7 +77,7 @@ In particular, `Job`-based `Workload`s with `podReplacementPolicy: Failed` are u
 
 ### Non-Goals
 
-* Detecting whether a zombie pod was terminated properly and released all it's resources.
+* Detecting whether a zombie pod was terminated properly and released all its resources.
 
 ## Proposal
 
@@ -96,14 +96,14 @@ as my framework expects exactly one pod per worker index.
 Some nodes in my cluster often go offline for long periods of time, during which my job is unable to make progress -
 replacement pods will not be scheduled as long as the node remains offline. I'd like for my jobs to be automatically unblocked
 as soon as possible, so I can make best use of the available resources (since the training process is synchronized,
-there is no risk of data corruption in my case).
+there is no risk of data corruption in my case.)
 
 ### Risks and Mitigations
 
 #### Replacing Pods Which Are Still Running
 
 Starting a replacement pod without a guarantee that the original one was properly terminated carries an inherent risk
-and might result in inconsistencies, as discussed above.
+and might result in inconsistencies as discussed above.
 If this risk is not communicated to the user properly and the feature is not sufficiently explicit in its behavior,
 the users might mistake it for a general issue within Kueue/the broader Kubernetes ecosystem.
 
@@ -158,7 +158,7 @@ spec:
 
 ### Grace Period
 
-When a pod is marked for termination, it's assigned with a `deletionGracePeriodSeconds`.
+When a pod is marked for termination, it is assigned a `deletionGracePeriodSeconds`.
 This grace period defines the amount of time the pod has to terminate gracefully.
 This KEP defines "pods stuck terminating" as pods that were not terminated **1 minute** after the `deletionGracePeriodSeconds` elapsed.
 The value of 1 minute is chosen to get initial feedback about the feature and help inform the decision on the structure of the API and setting defaults makes sense when graduating to beta.
@@ -207,7 +207,7 @@ source:
 
 ### Implementation Overview
 
-Enabling the `FailureRecoveryPolicy` feature gate will turn on a controller, which manages the failed nodes.
+Enabling the `FailureRecoveryPolicy` feature gate will turn on a controller, that manages the failed nodes.
 
 The controller has to **ignore** updates to pods that:
 1. Are not terminating.
@@ -242,7 +242,7 @@ The proposal will be covered with unit tests for:
 
 #### Integration Tests
 
-The proposal will be covered with integrations tests that check whether:
+The proposal will be covered with integration tests that check whether:
 1. Adding a deletion timestamp to the pod requeues a reconciliation loop for when the grace period elapses.
 1. After the grace period elapses, the pod is marked as `Failed`.
 1. Replacement pods are scheduled in the place of the failed pod (optional, technically 1+2 is sufficient to prove this).
@@ -272,7 +272,7 @@ Existing integration tests should prove that this feature does not impact Kueue 
 ## Drawbacks
 
 * The same feature is discussed in core Kubernetes ([kubernetes/issues/134038](https://github.com/kubernetes/kubernetes/issues/134038)), so the underlying issue could potentially be fixed upstream. The timeline of an upstream change is long, but if the feature is deemed not time-critical, it could be fixed at the source instead of in Kueue.
-* This feature introduces a potential footgun to Kueue users and could turn out to be to volatile/risky to use in most affected cases.
+* This feature introduces a potential footgun to Kueue users and could turn out to be too volatile/risky to use in most affected cases.
 * It introduces yet another responsibility for Kueue - on top of quota management and scheduling, it will also start performing failure recovery.
 
 ## Alternatives
@@ -291,11 +291,11 @@ The biggest benefit of this approach is that it requires no implementation effor
 
 ### Control All Pods Managed By Kueue
 
-Instead of limiting the affected pods with the new annotation, the controlled could cover all pods managed by Kueue.
+Instead of limiting the affected pods with the new annotation, the controller could cover all pods managed by Kueue.
 
 **Reasons for discarding/deferring**
 
-1. It will make the feature harder to test for the early adopters, since they would have to commit all the pods to test
+1. It will make the feature harder to test for the early adopters, since they would have to commit all their pods to test
 an alpha feature.
 
 ### Introduce a `FailureRecoveryPolicy` API
@@ -342,7 +342,7 @@ type TerminatePodConfig struct {
 }
 ```
 
-This API requires opt-in both from the administrators and user's end, as the workloads would
+This API requires opt-in both from the administrator's and user's end, as the workloads would
 have to be labeled in order for them to be covered with failure recovery.
 
 An example failure recovery configuration:
@@ -361,7 +361,7 @@ failureRecoveryPolicy:
 
 With the new API, the proposal is to **not** set a default value for the forceful termination grace period.
 This puts configuration over convention, as it will make the user consciously think about the
-grace period the need for their specific use case, without risking a faulty default.
+grace period they need for their specific use case, without risking a faulty default.
 
 Since enabling the feature is inherently risky, this serves as an additional explicit
 acknowledgement of this risk from the user's end.
