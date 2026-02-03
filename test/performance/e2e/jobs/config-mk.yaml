@@ -5,11 +5,6 @@
 {{$mediumJobs := DefaultParam .CL2_MEDIUM_JOBS 2}}
 {{$largeJobs := DefaultParam .CL2_LARGE_JOBS 0}}
 
-{{$namespaces := DefaultParam .CL2_NAMESPACES 1}}
-
-{{$smallJobsPerNamespace := DivideInt $smallJobs $namespaces}}
-{{$mediumJobsPerNamespace := DivideInt $mediumJobs $namespaces}}
-{{$largeJobsPerNamespace := DivideInt $largeJobs $namespaces}}
 
 {{$smallJobSize := 5}}
 {{$mediumJobSize := 20}}
@@ -17,26 +12,24 @@
 
 {{$jobRunningTime := DefaultParam .CL2_JOB_RUNNING_TIME "30s"}}
 
-{{$clusterQueue := "default-cluster-queue"}}
-{{$localQueue := "local-queue"}}
+{{$clusterQueue := "cluster-queue"}}
+{{$localQueue := "user-queue"}}
 
 {{$testTimeout := DefaultParam .CL2_TEST_TIMEOUT "5m"}}
 
-{{$namespacePrefix := "queue-test"}}
+{{$namespacePrefix := "default"}}
 
 {{$useKueue := DefaultParam .CL2_USE_KUEUE false}}
 
 name: batch
 
 namespace:
-  number: {{$namespaces}}
-  prefix: {{$namespacePrefix}}
+  number: 0
 
 tuningSets:
 - name: UniformQPS
   qpsLoad:
-    qps: 10
-    # qps: {{$LOAD_TEST_THROUGHPUT}}
+    qps: {{$LOAD_TEST_THROUGHPUT}}
 
 steps:
 - name: Start measurements
@@ -84,26 +77,10 @@ steps:
     Method: Sleep
     Params:
       duration: 10s  
-{{if $useKueue}}
-- name: Create local queue
-  phases: 
-  - namespaceRange:
-      min: 1
-      max: {{$namespaces}}
-    replicasPerNamespace: 1
-    tuningSet: UniformQPS
-    objectBundle:
-    - basename: {{$localQueue}}
-      objectTemplatePath: "local-queue.yaml"
-      templateFillMap:
-        ClusterQueue: {{$clusterQueue}}     
-{{end}}
 - name: Create {{$MODE}} jobs
   phases:
-  - namespaceRange:
-      min: 1
-      max: {{$namespaces}}
-    replicasPerNamespace: {{$smallJobsPerNamespace}}
+  - namespaceList: ["default"]
+    replicasPerNamespace: {{$smallJobs}}
     tuningSet: UniformQPS
     objectBundle:
     - basename: small
@@ -113,11 +90,9 @@ steps:
         Replicas: {{$smallJobSize}}
         Mode: {{$MODE}}
         Sleep: {{$jobRunningTime}}
-        LocalQueue: "{{$localQueue}}-0"        
-  - namespaceRange:
-      min: 1
-      max: {{$namespaces}}
-    replicasPerNamespace: {{$mediumJobsPerNamespace}}
+        LocalQueue: "{{$localQueue}}"        
+  - namespaceList: ["default"]
+    replicasPerNamespace: {{$mediumJobs}}
     tuningSet: UniformQPS
     objectBundle:
     - basename: medium
@@ -127,11 +102,9 @@ steps:
         Replicas: {{$mediumJobSize}}
         Mode: {{$MODE}}
         Sleep: {{$jobRunningTime}}
-        LocalQueue: "{{$localQueue}}-0"
-  - namespaceRange:
-      min: 1
-      max: {{$namespaces}}
-    replicasPerNamespace: {{$largeJobsPerNamespace}}
+        LocalQueue: "{{$localQueue}}"
+  - namespaceList: ["default"]
+    replicasPerNamespace: {{$largeJobs}}
     tuningSet: UniformQPS
     objectBundle:
     - basename: large
@@ -141,7 +114,7 @@ steps:
         Replicas: {{$largeJobSize}}
         Mode: {{$MODE}}
         Sleep: {{$jobRunningTime}}
-        LocalQueue: "{{$localQueue}}-0"                
+        LocalQueue: "{{$localQueue}}"                
 - name: Wait for {{$MODE}} jobs to finish
   measurements:
   - Identifier: JobLifecycleLatency
