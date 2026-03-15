@@ -28,8 +28,8 @@ import (
 type PreemptionGateStateApplyConfiguration struct {
 	// name identifies the preemption gate.
 	Name *string `json:"name,omitempty"`
-	// state of the preemption gate. One of
-	State *kueuev1beta2.GateState `json:"state,omitempty"`
+	// position of the preemption gate. One of
+	Position *kueuev1beta2.PreemptionGatePosition `json:"position,omitempty"`
 	// lastTransitionTime is the last time the gate transitioned from one status to another.
 	LastTransitionTime *v1.Time `json:"lastTransitionTime,omitempty"`
 }
@@ -48,11 +48,11 @@ func (b *PreemptionGateStateApplyConfiguration) WithName(value string) *Preempti
 	return b
 }
 
-// WithState sets the State field in the declarative configuration to the given value
+// WithPosition sets the Position field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the State field is set to the value of the last call.
-func (b *PreemptionGateStateApplyConfiguration) WithState(value kueuev1beta2.GateState) *PreemptionGateStateApplyConfiguration {
-	b.State = &value
+// If called multiple times, the Position field is set to the value of the last call.
+func (b *PreemptionGateStateApplyConfiguration) WithPosition(value kueuev1beta2.PreemptionGatePosition) *PreemptionGateStateApplyConfiguration {
+	b.Position = &value
 	return b
 }
 

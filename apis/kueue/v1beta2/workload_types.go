@@ -896,14 +896,14 @@ type PodSetRequest struct {
 	Resources corev1.ResourceList `json:"resources,omitempty"`
 }
 
-type GateState string
+type PreemptionGatePosition string
 
 const (
-	// GateStateClosed means that the gate is blocking the workload from preempting.
-	GateStateClosed GateState = "Closed"
+	// PreemptionGatePositionClosed means that the gate is blocking the workload from preempting.
+	PreemptionGatePositionClosed PreemptionGatePosition = "Closed"
 
-	// GateStateOpen means that the gate is not blocking the workload from preempting.
-	GateStateOpen GateState = "Open"
+	// PreemptionGatePositionOpen means that the gate is not blocking the workload from preempting.
+	PreemptionGatePositionOpen PreemptionGatePosition = "Open"
 )
 
 type PreemptionGateState struct {
@@ -913,10 +913,10 @@ type PreemptionGateState struct {
 	// +required
 	Name string `json:"name"`
 
-	// state of the preemption gate. One of
+	// position of the preemption gate. One of
 	// +kubebuilder:validation:Enum=Closed;Open
 	// +required
-	State GateState `json:"state,omitempty"`
+	Position PreemptionGatePosition `json:"position,omitempty"`
 
 	// lastTransitionTime is the last time the gate transitioned from one status to another.
 	// +required
@@ -932,7 +932,7 @@ const (
 
 	// WorkloadPreemptionBlocked means that the Workload attempted to reserve quota via a preemption, but was blocked.
 	// The possible reasons for this condition are:
-	// - "PreemptionGated": the workload could not preempt to acquire quota due to a preemption gate.
+	// - "PreemptionGated": the preemptor workload could not preempt the preemption targets to acquire quota due to a preemption gate.
 	WorkloadPreemptionBlocked = "PreemptionBlocked"
 
 	// WorkloadQuotaReserved means that the Workload has reserved quota a ClusterQueue.

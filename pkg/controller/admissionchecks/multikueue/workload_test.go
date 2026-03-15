@@ -1590,7 +1590,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1609,7 +1609,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1639,7 +1639,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1658,7 +1658,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGateStates(
 						kueue.PreemptionGateState{
 							Name:               constants.MultiKueuePreemptionGate,
-							State:              kueue.GateStateOpen,
+							Position:           kueue.PreemptionGatePositionOpen,
 							LastTransitionTime: metav1.NewTime(now),
 						},
 					).
@@ -1695,7 +1695,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateOpen,
+						Position:           kueue.PreemptionGatePositionOpen,
 						LastTransitionTime: metav1.NewTime(muchEarlier),
 					}).
 					Obj(),
@@ -1707,7 +1707,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1737,7 +1737,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateOpen,
+						Position:           kueue.PreemptionGatePositionOpen,
 						LastTransitionTime: metav1.NewTime(muchEarlier),
 					}).
 					Obj(),
@@ -1748,7 +1748,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateOpen,
+						Position:           kueue.PreemptionGatePositionOpen,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1784,7 +1784,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateOpen,
+						Position:           kueue.PreemptionGatePositionOpen,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Obj(),
@@ -1796,7 +1796,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
@@ -1826,7 +1826,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateOpen,
+						Position:           kueue.PreemptionGatePositionOpen,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Obj(),
@@ -1837,7 +1837,7 @@ func TestWlReconcile(t *testing.T) {
 					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
 					PreemptionGateStates(kueue.PreemptionGateState{
 						Name:               constants.MultiKueuePreemptionGate,
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{

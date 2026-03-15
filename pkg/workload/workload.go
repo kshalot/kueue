@@ -969,24 +969,24 @@ func SetPreemptionBlockedCondition(w *kueue.Workload, now time.Time, reason stri
 // HasClosedPreemptionGate checks if the workload contains any PreemptionGate
 // that is considered closed, preventing it from triggering preemptions.
 func HasClosedPreemptionGate(w *kueue.Workload) bool {
-	gateStates := make(map[string]kueue.GateState)
+	gatePositions := make(map[string]kueue.PreemptionGatePosition)
 	for _, gateState := range w.Status.PreemptionGates {
-		gateStates[gateState.Name] = gateState.State
+		gatePositions[gateState.Name] = gateState.Position
 	}
 
 	return slices.ContainsFunc(w.Spec.PreemptionGates, func(pg kueue.PreemptionGate) bool {
-		state, hasState := gateStates[pg.Name]
+		position, hasPosition := gatePositions[pg.Name]
 		// Preemption gates that are present only in `.spec` are considered closed.
 		// This ensures that the workload can be created gated atomically.
-		if !hasState {
+		if !hasPosition {
 			return true
 		}
-		return state == kueue.GateStateClosed
+		return position == kueue.PreemptionGatePositionClosed
 	})
 }
 
-// SetPreemptionGateState sets the state of a preemption gate with the given name.
-func SetPreemptionGateState(w *kueue.Workload, gateName string, gateState kueue.GateState, transitionTime metav1.Time) bool {
+// SetPreemptionGatePosition sets the position of a preemption gate with the given name.
+func SetPreemptionGatePosition(w *kueue.Workload, gateName string, gatePosition kueue.PreemptionGatePosition, transitionTime metav1.Time) bool {
 	gateIdx := slices.IndexFunc(w.Spec.PreemptionGates, func(gate kueue.PreemptionGate) bool {
 		return gate.Name == gateName
 	})
@@ -1001,11 +1001,11 @@ func SetPreemptionGateState(w *kueue.Workload, gateName string, gateState kueue.
 	if gateStateIdx == -1 {
 		w.Status.PreemptionGates = append(w.Status.PreemptionGates, kueue.PreemptionGateState{
 			Name:               gateName,
-			State:              gateState,
+			Position:           gatePosition,
 			LastTransitionTime: transitionTime,
 		})
 	} else {
-		w.Status.PreemptionGates[gateStateIdx].State = gateState
+		w.Status.PreemptionGates[gateStateIdx].Position = gatePosition
 		w.Status.PreemptionGates[gateStateIdx].LastTransitionTime = transitionTime
 	}
 
@@ -1675,7 +1675,7 @@ func unsetPreemptionBlockedCondition(w *kueue.Workload, now time.Time, reason, m
 
 func closeAllPreemptionGates(w *kueue.Workload, now time.Time) {
 	for i := range w.Status.PreemptionGates {
-		w.Status.PreemptionGates[i].State = kueue.GateStateClosed
+		w.Status.PreemptionGates[i].Position = kueue.PreemptionGatePositionClosed
 		w.Status.PreemptionGates[i].LastTransitionTime = metav1.NewTime(now)
 	}
 }

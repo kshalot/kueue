@@ -516,7 +516,7 @@ func (w *wlReconciler) reconcileGroup(ctx context.Context, group *wlGroup) (reco
 		if remWlName != nil {
 			remWl := group.remotes[*remWlName]
 			remClient := group.remoteClients[*remWlName]
-			workload.SetPreemptionGateState(remWl, constants.MultiKueuePreemptionGate, kueue.GateStateOpen, metav1.NewTime(w.clock.Now()))
+			workload.SetPreemptionGatePosition(remWl, constants.MultiKueuePreemptionGate, kueue.PreemptionGatePositionOpen, metav1.NewTime(w.clock.Now()))
 			if err := remClient.client.Status().Update(ctx, remWl); err != nil {
 				return reconcile.Result{}, fmt.Errorf("failed to update remote workload: %w", err)
 			}
@@ -1032,7 +1032,7 @@ func (w *wlReconciler) workloadToOpenPreemptionGate(group *wlGroup) (*string, ti
 		}
 
 		openMkGateStateIdx := slices.IndexFunc(wl.Status.PreemptionGates, func(gate kueue.PreemptionGateState) bool {
-			return gate.Name == constants.MultiKueuePreemptionGate && gate.State == kueue.GateStateOpen
+			return gate.Name == constants.MultiKueuePreemptionGate && gate.Position == kueue.PreemptionGatePositionOpen
 		})
 		if openMkGateStateIdx == -1 {
 			preemptionSignalCond := apimeta.FindStatusCondition(wl.Status.Conditions, kueue.WorkloadPreemptionBlocked)

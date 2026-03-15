@@ -724,7 +724,7 @@ func (r *WorkloadReconciler) syncPreemptionGateStates(wl *kueue.Workload) bool {
 		if _, ok := preemptionGateStates[gate.Name]; !ok {
 			wl.Status.PreemptionGates = append(wl.Status.PreemptionGates, kueue.PreemptionGateState{
 				Name:               gate.Name,
-				State:              kueue.GateStateClosed,
+				Position:           kueue.PreemptionGatePositionClosed,
 				LastTransitionTime: metav1.NewTime(r.clock.Now()),
 			})
 			changed = true

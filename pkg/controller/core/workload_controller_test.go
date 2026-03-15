@@ -2579,12 +2579,12 @@ func TestReconcile(t *testing.T) {
 				PreemptionGateStates(
 					kueue.PreemptionGateState{
 						Name:               "synchronized",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 					kueue.PreemptionGateState{
 						Name:               "desynchronized-spec",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 				).
@@ -2601,12 +2601,12 @@ func TestReconcile(t *testing.T) {
 				PreemptionGateStates(
 					kueue.PreemptionGateState{
 						Name:               "synchronized",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 					kueue.PreemptionGateState{
 						Name:               "desynchronized-status",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 				).
@@ -2629,12 +2629,12 @@ func TestReconcile(t *testing.T) {
 				PreemptionGateStates(
 					kueue.PreemptionGateState{
 						Name:               "synchronized",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 					kueue.PreemptionGateState{
 						Name:               "desynchronized-status",
-						State:              kueue.GateStateClosed,
+						Position:           kueue.PreemptionGatePositionClosed,
 						LastTransitionTime: metav1.NewTime(now),
 					},
 				).

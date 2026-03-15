@@ -1514,18 +1514,6 @@ There could be up to 64 resources.</p>
 </tbody>
 </table>
 
-## `GateState`     {#kueue-x-k8s-io-v1beta2-GateState}
-    
-(Alias of `string`)
-
-**Appears in:**
-
-- [PreemptionGateState](#kueue-x-k8s-io-v1beta2-PreemptionGateState)
-
-
-
-
-
 ## `KubeConfig`     {#kueue-x-k8s-io-v1beta2-KubeConfig}
     
 
@@ -2499,6 +2487,18 @@ result in failure during workload admission.</p>
 </tbody>
 </table>
 
+## `PreemptionGatePosition`     {#kueue-x-k8s-io-v1beta2-PreemptionGatePosition}
+    
+(Alias of `string`)
+
+**Appears in:**
+
+- [PreemptionGateState](#kueue-x-k8s-io-v1beta2-PreemptionGateState)
+
+
+
+
+
 ## `PreemptionGateState`     {#kueue-x-k8s-io-v1beta2-PreemptionGateState}
     
 
@@ -2520,11 +2520,11 @@ result in failure during workload admission.</p>
    <p>name identifies the preemption gate.</p>
 </td>
 </tr>
-<tr><td><code>state</code> <B>[Required]</B><br/>
-<a href="#kueue-x-k8s-io-v1beta2-GateState"><code>GateState</code></a>
+<tr><td><code>position</code> <B>[Required]</B><br/>
+<a href="#kueue-x-k8s-io-v1beta2-PreemptionGatePosition"><code>PreemptionGatePosition</code></a>
 </td>
 <td>
-   <p>state of the preemption gate. One of</p>
+   <p>position of the preemption gate. One of</p>
 </td>
 </tr>
 <tr><td><code>lastTransitionTime,omitempty,omitzero</code> <B>[Required]</B><br/>
