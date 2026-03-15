@@ -1594,7 +1594,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1613,7 +1613,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1643,7 +1643,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1663,7 +1663,7 @@ func TestWlReconcile(t *testing.T) {
 						},
 					).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1711,7 +1711,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1752,7 +1752,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1800,7 +1800,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",
@@ -1841,7 +1841,7 @@ func TestWlReconcile(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Preemption gate closed",

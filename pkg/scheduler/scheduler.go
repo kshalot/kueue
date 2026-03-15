@@ -863,7 +863,7 @@ func (s *Scheduler) requeueAndUpdate(ctx context.Context, e entry) {
 				updated = true
 			}
 			if e.status == preemptionGated {
-				updated = workload.SetPreemptionBlockedCondition(wl, s.clock.Now(), kueue.PreemptionGated, e.inadmissibleMsg)
+				updated = workload.SetBlockedOnPreemptionGatesCondition(wl, s.clock.Now(), kueue.PreemptionGated, e.inadmissibleMsg)
 			}
 			return updated, nil
 		}, workload.WithLooseOnApply(), workload.WithRetryOnConflictForPatch()); err != nil {

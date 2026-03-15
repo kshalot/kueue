@@ -930,10 +930,10 @@ const (
 	// defined in the ClusterQueue are satisfied.
 	WorkloadAdmitted = "Admitted"
 
-	// WorkloadPreemptionBlocked means that the Workload attempted to reserve quota via a preemption, but was blocked.
+	// WorkloadBlockedOnPreemptionGates means that the Workload attempted to reserve quota via a preemption, but was blocked.
 	// The possible reasons for this condition are:
 	// - "PreemptionGated": the preemptor workload could not preempt the preemption targets to acquire quota due to a preemption gate.
-	WorkloadPreemptionBlocked = "PreemptionBlocked"
+	WorkloadBlockedOnPreemptionGates = "BlockedOnPreemptionGates"
 
 	// WorkloadQuotaReserved means that the Workload has reserved quota a ClusterQueue.
 	WorkloadQuotaReserved = "QuotaReserved"

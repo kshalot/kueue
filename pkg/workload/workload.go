@@ -75,7 +75,7 @@ const (
 var (
 	admissionManagedConditions = []string{
 		kueue.WorkloadQuotaReserved,
-		kueue.WorkloadPreemptionBlocked,
+		kueue.WorkloadBlockedOnPreemptionGates,
 		kueue.WorkloadEvicted,
 		kueue.WorkloadAdmitted,
 		kueue.WorkloadPreempted,
@@ -850,7 +850,7 @@ func SetQuotaReservation(w *kueue.Workload, admission *kueue.Admission, clock cl
 		changed = true
 	}
 
-	if resetActiveCondition(&w.Status.Conditions, w.Generation, kueue.WorkloadPreemptionBlocked, reason, clock) {
+	if resetActiveCondition(&w.Status.Conditions, w.Generation, kueue.WorkloadBlockedOnPreemptionGates, reason, clock) {
 		changed = true
 	}
 
@@ -954,9 +954,9 @@ func SetFinishedCondition(w *kueue.Workload, now time.Time, reason string, messa
 	return apimeta.SetStatusCondition(&w.Status.Conditions, condition)
 }
 
-func SetPreemptionBlockedCondition(w *kueue.Workload, now time.Time, reason string, message string) bool {
+func SetBlockedOnPreemptionGatesCondition(w *kueue.Workload, now time.Time, reason string, message string) bool {
 	condition := metav1.Condition{
-		Type:               kueue.WorkloadPreemptionBlocked,
+		Type:               kueue.WorkloadBlockedOnPreemptionGates,
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.NewTime(now),
 		Reason:             reason,
@@ -1643,7 +1643,7 @@ func prepareForEviction(w *kueue.Workload, now time.Time, reason, message string
 	resetClusterNomination(w)
 	resetChecksOnEviction(w, now)
 	resetUnhealthyNodes(w)
-	unsetPreemptionBlockedCondition(w, now, reason, message)
+	unsetBlockedOnPreemptionGatesCondition(w, now, reason, message)
 	closeAllPreemptionGates(w, now)
 }
 
@@ -1656,14 +1656,14 @@ func resetUnhealthyNodes(w *kueue.Workload) {
 	w.Status.UnhealthyNodes = nil
 }
 
-func unsetPreemptionBlockedCondition(w *kueue.Workload, now time.Time, reason, message string) {
-	preemptionSignalCond := apimeta.FindStatusCondition(w.Status.Conditions, kueue.WorkloadPreemptionBlocked)
+func unsetBlockedOnPreemptionGatesCondition(w *kueue.Workload, now time.Time, reason, message string) {
+	preemptionSignalCond := apimeta.FindStatusCondition(w.Status.Conditions, kueue.WorkloadBlockedOnPreemptionGates)
 	if preemptionSignalCond == nil || preemptionSignalCond.Status != metav1.ConditionTrue {
 		return
 	}
 
 	condition := metav1.Condition{
-		Type:               kueue.WorkloadPreemptionBlocked,
+		Type:               kueue.WorkloadBlockedOnPreemptionGates,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: metav1.NewTime(now),
 		Reason:             reason,

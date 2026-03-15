@@ -1035,7 +1035,7 @@ func (w *wlReconciler) workloadToOpenPreemptionGate(group *wlGroup) (*string, ti
 			return gate.Name == constants.MultiKueuePreemptionGate && gate.Position == kueue.PreemptionGatePositionOpen
 		})
 		if openMkGateStateIdx == -1 {
-			preemptionSignalCond := apimeta.FindStatusCondition(wl.Status.Conditions, kueue.WorkloadPreemptionBlocked)
+			preemptionSignalCond := apimeta.FindStatusCondition(wl.Status.Conditions, kueue.WorkloadBlockedOnPreemptionGates)
 			wlRequiresPreemption := preemptionSignalCond != nil && preemptionSignalCond.Status == metav1.ConditionTrue
 			wlHasOlderPreemptionSignal := oldestPreemptionSignalTime == nil || preemptionSignalCond.LastTransitionTime.Before(oldestPreemptionSignalTime)
 			if wlRequiresPreemption && wlHasOlderPreemptionSignal {

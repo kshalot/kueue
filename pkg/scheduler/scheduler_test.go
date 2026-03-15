@@ -8168,7 +8168,7 @@ func TestSchedule(t *testing.T) {
 						LastTransitionTime: metav1.NewTime(now),
 					}).
 					Condition(metav1.Condition{
-						Type:               kueue.WorkloadPreemptionBlocked,
+						Type:               kueue.WorkloadBlockedOnPreemptionGates,
 						Status:             metav1.ConditionTrue,
 						Reason:             kueue.PreemptionGated,
 						Message:            "Workload requires preemption, but it's gated",
@@ -9596,7 +9596,7 @@ func TestRequeueAndUpdate(t *testing.T) {
 						Message: "preemption gated",
 					},
 					{
-						Type:    kueue.WorkloadPreemptionBlocked,
+						Type:    kueue.WorkloadBlockedOnPreemptionGates,
 						Status:  metav1.ConditionTrue,
 						Reason:  "PreemptionGated",
 						Message: "preemption gated",
