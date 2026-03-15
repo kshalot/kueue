@@ -221,13 +221,13 @@ The `PreemptionGated` condition will be defined as follows:
 ```go
 const (
   ...
-  // WorkloadPreemptionBlocked means that the Workload attempted to reserve quota via a preemption, but was blocked.
+  // WorkloadBlockedOnPreemptionGates means that the Workload attempted to reserve quota via a preemption, but was blocked.
   // The possible reasons for this condition are:
   // - "PreemptionGated": the preemptor workload could not preempt the preemption targets to acquire quota due to a preemption gate.
-  WorkloadPreemptionBlocked = "PreemptionBlocked"
+  WorkloadBlockedOnPreemptionGates = "BlockedOnPreemptionGates"
 )
 
-// Reasons for the WorkloadPreemptionBlocked condition.
+// Reasons for the WorkloadBlockedOnPreemptionGates condition.
 const (
   // PreemptionGated indicates the Workload could free up quota via
   // preemption, but was prevented from doing so by a preemption gate.
