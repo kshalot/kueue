@@ -179,14 +179,14 @@ type WorkloadSpec struct {
   PreemptionGates []PreemptionGate `json:"preemptionGates,omitempty"`
 }
 
-type GateState string
+type PreemptionGatePosition string
 
 const (
-  // GateStateClosed means that the gate is blocking the workload from preempting.
-  GateStateClosed GateState = "Closed"
+  // PreemptionGatePositionClosed means that the gate is blocking the workload from preempting.
+  PreemptionGatePositionClosed PreemptionGatePosition = "Closed"
 
-  // GateStateOpen means that the gate is not blocking the workload from preempting.
-  GateStateOpen GateState = "Open"
+  // PreemptionGatePositionOpen means that the gate is not blocking the workload from preempting.
+  PreemptionGatePositionOpen PreemptionGatePosition = "Open"
 )
 
 type PreemptionGateState struct {
@@ -196,10 +196,10 @@ type PreemptionGateState struct {
   // +required
   Name string `json:"name"`
 
-  // state of the preemption gate. One of
+  // position of the preemption gate. One of
   // +kubebuilder:validation:Enum=Closed;Open
   // +required
-  State GateState `json:"state"`
+  Position PreemptionGatePosition `json:"position"`
 
   // lastTransitionTime is the last time the gate transitioned from one status to another.
   // +required
