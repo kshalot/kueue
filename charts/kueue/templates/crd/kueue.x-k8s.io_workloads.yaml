@@ -17834,8 +17834,8 @@ spec:
                         maxLength: 63
                         minLength: 1
                         type: string
-                      state:
-                        description: state of the preemption gate. One of
+                      position:
+                        description: position of the preemption gate. One of
                         enum:
                           - Closed
                           - Open
@@ -17843,7 +17843,7 @@ spec:
                     required:
                       - lastTransitionTime
                       - name
-                      - state
+                      - position
                     type: object
                   maxItems: 8
                   type: array
