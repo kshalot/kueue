@@ -1037,11 +1037,16 @@ func (w *wlReconciler) workloadToOpenPreemptionGate(group *wlGroup) (*string, ti
 		if openMkGateStateIdx == -1 {
 			preemptionSignalCond := apimeta.FindStatusCondition(wl.Status.Conditions, kueue.WorkloadBlockedOnPreemptionGates)
 			wlRequiresPreemption := preemptionSignalCond != nil && preemptionSignalCond.Status == metav1.ConditionTrue
-			wlHasOlderPreemptionSignal := oldestPreemptionSignalTime == nil || preemptionSignalCond.LastTransitionTime.Before(oldestPreemptionSignalTime)
-			if wlRequiresPreemption && wlHasOlderPreemptionSignal {
-				workloadToUngateClusterName = &clusterName
-				oldestPreemptionSignalTime = &preemptionSignalCond.LastTransitionTime
+			if !wlRequiresPreemption {
+				continue
 			}
+			wlHasOlderPreemptionSignal := oldestPreemptionSignalTime == nil || preemptionSignalCond.LastTransitionTime.Before(oldestPreemptionSignalTime)
+			if !wlHasOlderPreemptionSignal {
+				continue
+			}
+
+			workloadToUngateClusterName = &clusterName
+			oldestPreemptionSignalTime = &preemptionSignalCond.LastTransitionTime
 		} else {
 			openMkGateState := wl.Status.PreemptionGates[openMkGateStateIdx]
 			gateOpenedTime := openMkGateState.LastTransitionTime
