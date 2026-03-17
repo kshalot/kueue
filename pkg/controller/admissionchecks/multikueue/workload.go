@@ -412,7 +412,10 @@ func (w *wlReconciler) reconcileGroup(ctx context.Context, group *wlGroup) (reco
 	// - workloads for which workload priority has changed
 	for rem, remWl := range group.remotes {
 		if remWl != nil && isRemoteSpecOutOfSync(group.local.Spec, remWl.Spec) {
-			remotePreemptionGates := remWl.Spec.PreemptionGates
+			var remotePreemptionGates []kueue.PreemptionGate
+			if features.Enabled(features.MultiKueueOrchestratedPreemption) {
+				remotePreemptionGates = remWl.Spec.PreemptionGates
+			}
 
 			remClient := group.remoteClients[rem]
 
@@ -432,8 +435,10 @@ func (w *wlReconciler) reconcileGroup(ctx context.Context, group *wlGroup) (reco
 			}
 
 			if updateRemote {
-				// Make sure to not overwrite preemption gates which are managed by the worker.
-				remWl.Spec.PreemptionGates = remotePreemptionGates
+				if features.Enabled(features.MultiKueueOrchestratedPreemption) {
+					// Make sure to not overwrite preemption gates which are managed by the worker.
+					remWl.Spec.PreemptionGates = remotePreemptionGates
+				}
 
 				if err := remClient.client.Update(ctx, remWl); err != nil {
 					return reconcile.Result{}, fmt.Errorf("failed to update remote workload: %w", err)
