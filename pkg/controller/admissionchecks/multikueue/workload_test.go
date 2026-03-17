@@ -1850,6 +1850,81 @@ func TestWlReconcile(t *testing.T) {
 					Obj(),
 			},
 		},
+		"not opening preemption gate for the second workload if timeout elapsed but it does not require preemption": {
+			features: map[featuregate.Feature]bool{
+				features.MultiKueueOrchestratedPreemption: true,
+			},
+			reconcileFor: "wl1",
+
+			managersWorkloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					AdmissionCheck(kueue.AdmissionCheckState{Name: "ac1", State: kueue.CheckStatePending}).
+					ControllerReference(batchv1.SchemeGroupVersion.WithKind("Job"), "job1", "uid1").
+					ReserveQuotaAt(utiltestingapi.MakeAdmission("q1").Obj(), now).
+					Obj(),
+			},
+			managersJobs: []batchv1.Job{
+				*baseJobManagedByKueueBuilder.Clone().Obj(),
+			},
+
+			worker1Workloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					Label(kueue.MultiKueueOriginLabel, defaultOrigin).
+					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
+					PreemptionGateStates(kueue.PreemptionGateState{
+						Name:               constants.MultiKueuePreemptionGate,
+						Position:           kueue.PreemptionGatePositionOpen,
+						LastTransitionTime: metav1.NewTime(muchEarlier),
+					}).
+					Obj(),
+			},
+			useSecondWorker: true,
+			worker2Workloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					Label(kueue.MultiKueueOriginLabel, defaultOrigin).
+					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
+					PreemptionGateStates(kueue.PreemptionGateState{
+						Name:               constants.MultiKueuePreemptionGate,
+						Position:           kueue.PreemptionGatePositionClosed,
+						LastTransitionTime: metav1.NewTime(now),
+					}).
+					Obj(),
+			},
+
+			wantManagersWorkloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					AdmissionCheck(kueue.AdmissionCheckState{Name: "ac1", State: kueue.CheckStatePending}).
+					ControllerReference(batchv1.SchemeGroupVersion.WithKind("Job"), "job1", "uid1").
+					ReserveQuotaAt(utiltestingapi.MakeAdmission("q1").Obj(), now).
+					NominatedClusterNames("worker1", "worker2").
+					Obj(),
+			},
+			wantManagersJobs: []batchv1.Job{
+				*baseJobManagedByKueueBuilder.Clone().Obj(),
+			},
+			wantWorker1Workloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					Label(kueue.MultiKueueOriginLabel, defaultOrigin).
+					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
+					PreemptionGateStates(kueue.PreemptionGateState{
+						Name:               constants.MultiKueuePreemptionGate,
+						Position:           kueue.PreemptionGatePositionOpen,
+						LastTransitionTime: metav1.NewTime(muchEarlier),
+					}).
+					Obj(),
+			},
+			wantWorker2Workloads: []kueue.Workload{
+				*baseWorkloadBuilder.Clone().
+					Label(kueue.MultiKueueOriginLabel, defaultOrigin).
+					PreemptionGates(kueue.PreemptionGate{Name: constants.MultiKueuePreemptionGate}).
+					PreemptionGateStates(kueue.PreemptionGateState{
+						Name:               constants.MultiKueuePreemptionGate,
+						Position:           kueue.PreemptionGatePositionClosed,
+						LastTransitionTime: metav1.NewTime(now),
+					}).
+					Obj(),
+			},
+		},
 	}
 
 	for name, tc := range cases {
