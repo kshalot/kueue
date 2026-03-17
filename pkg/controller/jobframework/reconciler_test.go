@@ -19,6 +19,7 @@ package jobframework_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -340,6 +341,209 @@ func TestReconcileGenericJobWithCustomWorkloadActivation(t *testing.T) {
 			}
 			if *updated.Spec.Active != tc.expectedActive {
 				t.Fatalf("Workload.Spec.Active = %t, want %t", *updated.Spec.Active, tc.expectedActive)
+			}
+		})
+	}
+}
+
+func TestReconcileGenericJobWithCustomAnnotations(t *testing.T) {
+	const (
+		testJobName = "test-job"
+		testNS      = metav1.NamespaceDefault
+	)
+
+	var (
+		testLocalQueueName = kueue.LocalQueueName("test-lq")
+		testGVK            = batchv1.SchemeGroupVersion.WithKind("Job")
+		req                = types.NamespacedName{Name: testJobName, Namespace: testNS}
+	)
+
+	baseJob := testingjob.MakeJob(testJobName, testNS).UID(testJobName).Queue(testLocalQueueName).
+		SetAnnotation(workloadslicing.EnabledAnnotationKey, workloadslicing.EnabledAnnotationValue)
+	basePodSets := []kueue.PodSet{
+		*utiltestingapi.MakePodSet("main", 1).Obj(),
+	}
+
+	testCases := map[string]struct {
+		job                  *batchv1.Job
+		customAnnotations    map[string]string
+		customAnnotationsErr error
+		podSetsErr           error
+		patchInterceptErr    error
+		wantAnnotations      map[string]string
+		wantErrMsg           string
+	}{
+		"patches custom annotations onto job when GetCustomAnnotations returns annotations": {
+			job: baseJob.DeepCopy(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":3}]`,
+			},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":3}]`,
+			},
+		},
+		"does not patch when GetCustomAnnotations returns nil": {
+			job:               baseJob.DeepCopy(),
+			customAnnotations: nil,
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+			},
+		},
+		"does not patch when GetCustomAnnotations returns empty map": {
+			job:               baseJob.DeepCopy(),
+			customAnnotations: map[string]string{},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+			},
+		},
+		"updates annotation when value changes (scale up)": {
+			job: baseJob.Clone().
+				SetAnnotation(PodsetReplicaSizesAnnotation, `[{"name":"main","count":1}]`).
+				Obj(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":5}]`,
+			},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":5}]`,
+			},
+		},
+		"updates annotation when value changes (scale down)": {
+			job: baseJob.Clone().
+				SetAnnotation(PodsetReplicaSizesAnnotation, `[{"name":"main","count":5}]`).
+				Obj(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":2}]`,
+			},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":2}]`,
+			},
+		},
+		"no change when annotation already matches": {
+			job: baseJob.Clone().
+				SetAnnotation(PodsetReplicaSizesAnnotation, `[{"name":"main","count":3}]`).
+				Obj(),
+			customAnnotations: nil,
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":3}]`,
+			},
+		},
+		"skips patch when custom annotations already match existing values": {
+			job: baseJob.Clone().
+				SetAnnotation(PodsetReplicaSizesAnnotation, `[{"name":"main","count":5}]`).
+				Obj(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":5}]`,
+			},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":5}]`,
+			},
+		},
+		"patches only changed annotation when some already match": {
+			job: baseJob.Clone().
+				SetAnnotation(PodsetReplicaSizesAnnotation, `[{"name":"main","count":3}]`).
+				SetAnnotation("custom-annotation", "old-value").
+				Obj(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":3}]`,
+				"custom-annotation":          "new-value",
+			},
+			wantAnnotations: map[string]string{
+				workloadslicing.EnabledAnnotationKey: workloadslicing.EnabledAnnotationValue,
+				PodsetReplicaSizesAnnotation:         `[{"name":"main","count":3}]`,
+				"custom-annotation":                  "new-value",
+			},
+		},
+		"returns error when GetCustomAnnotations fails": {
+			job:                  baseJob.DeepCopy(),
+			customAnnotationsErr: errors.New("custom annotations error"),
+			wantErrMsg:           "failed to get custom annotations based on pod sets from job",
+		},
+		"returns error when annotation patch fails": {
+			job: baseJob.DeepCopy(),
+			customAnnotations: map[string]string{
+				PodsetReplicaSizesAnnotation: `[{"name":"main","count":3}]`,
+			},
+			patchInterceptErr: errors.New("patch conflict"),
+			wantErrMsg:        "failed to update custom annotations on job",
+		},
+		"returns error when PodSets fails": {
+			job:        baseJob.DeepCopy(),
+			podSetsErr: errors.New("pod sets retrieval error"),
+			wantErrMsg: "failed to retrieve pod sets from job",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			features.SetFeatureGateDuringTest(t, features.ElasticJobsViaWorkloadSlices, true)
+			ctx, _ := utiltesting.ContextWithLog(t)
+			mockctrl := gomock.NewController(t)
+
+			builder := utiltesting.NewClientBuilder(batchv1.AddToScheme, kueue.AddToScheme).
+				WithObjects(utiltesting.MakeNamespace(testNS)).
+				WithObjects(tc.job).
+				WithIndex(&kueue.Workload{}, indexer.OwnerReferenceIndexKey(testGVK), indexer.WorkloadOwnerIndexFunc(testGVK))
+
+			if tc.patchInterceptErr != nil {
+				builder = builder.WithInterceptorFuncs(interceptor.Funcs{
+					Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						if _, ok := obj.(*batchv1.Job); ok {
+							return tc.patchInterceptErr
+						}
+						return c.Patch(ctx, obj, patch, opts...)
+					},
+				})
+			}
+
+			cl := builder.Build()
+
+			recorder := &utiltesting.EventRecorder{}
+			reconciler := NewReconciler(cl, recorder)
+
+			mgj := &struct {
+				*mocks.MockGenericJob
+				*mocks.MockJobWithCustomAnnotations
+			}{
+				MockGenericJob:               mocks.NewMockGenericJob(mockctrl),
+				MockJobWithCustomAnnotations: mocks.NewMockJobWithCustomAnnotations(mockctrl),
+			}
+			mgj.MockGenericJob.EXPECT().Object().Return(tc.job).AnyTimes()
+			mgj.MockGenericJob.EXPECT().GVK().Return(testGVK).AnyTimes()
+			mgj.MockGenericJob.EXPECT().IsSuspended().Return(ptr.Deref(tc.job.Spec.Suspend, false)).AnyTimes()
+			mgj.MockGenericJob.EXPECT().IsActive().Return(tc.job.Status.Active != 0).AnyTimes()
+			mgj.MockGenericJob.EXPECT().Finished(gomock.Any()).Return("", false, false).AnyTimes()
+			mgj.MockGenericJob.EXPECT().PodSets(gomock.Any()).Return(basePodSets, tc.podSetsErr).AnyTimes()
+			mgj.MockJobWithCustomAnnotations.EXPECT().GetCustomAnnotations(gomock.Any(), gomock.Any(), gomock.Any()).Return(tc.customAnnotations, tc.customAnnotationsErr).AnyTimes()
+
+			_, err := reconciler.ReconcileGenericJob(ctx, controllerruntime.Request{NamespacedName: req}, mgj)
+
+			if tc.wantErrMsg != "" {
+				if err == nil {
+					t.Fatalf("Expected error containing %q, but got nil", tc.wantErrMsg)
+				}
+				if !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Fatalf("Expected error containing %q, got: %v", tc.wantErrMsg, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Failed to Reconcile GenericJob: %v", err)
+			}
+
+			// Fetch the job from the API server and verify its annotations
+			updatedJob := &batchv1.Job{}
+			if err := cl.Get(ctx, req, updatedJob); err != nil {
+				t.Fatalf("Failed to get job: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.wantAnnotations, updatedJob.GetAnnotations(), cmpopts.SortMaps(func(a, b string) bool { return a < b })); diff != "" {
+				t.Errorf("Job annotations mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

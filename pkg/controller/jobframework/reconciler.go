@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,6 +71,12 @@ import (
 const (
 	FailedToStartFinishedReason = "FailedToStart"
 	managedOwnersChainLimit     = 10
+
+	// PodsetReplicaSizesAnnotation is set on the job when autoscaling causes
+	// PodSet replica sizes to differ from the original spec. The value is a JSON
+	// array compatible with []kueue.PodSet, containing only the changed PodSets.
+	// This annotation is alpha-level enabled by the ElasticJobsViaWorkloadSlices.
+	PodsetReplicaSizesAnnotation = "kueue.x-k8s.io/podset-replica-sizes"
 )
 
 var (
@@ -886,6 +894,21 @@ func (r *JobReconciler) ensureOneWorkload(ctx context.Context, job GenericJob, o
 			return nil, fmt.Errorf("failed to retrieve pod sets from job: %w", err)
 		}
 
+		if jobWithCustomAnnotations, ok := job.(JobWithCustomAnnotations); ok {
+			customAnnotations, err := jobWithCustomAnnotations.GetCustomAnnotations(ctx, r.client, podSets)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get custom annotations based on pod sets from job %s: %w", job.Object().GetName(), err)
+			}
+			if newAnnotations, updated := mergeAnnotations(job, customAnnotations); updated {
+				if err := clientutil.Patch(ctx, r.client, object, func() (bool, error) {
+					job.Object().SetAnnotations(newAnnotations)
+					return true, nil
+				}); err != nil {
+					return nil, fmt.Errorf("failed to update custom annotations on job %s: %w", job.Object().GetName(), err)
+				}
+			}
+		}
+
 		// Workload slices allow modifications only to PodSet.Count.
 		// Any other changes will result in the slice being marked as incompatible,
 		// and the workload will fall back to being processed by the original ensureOneWorkload function.
@@ -1039,7 +1062,7 @@ func EnsurePrebuiltWorkloadOwnership(ctx context.Context, c client.Client, wl *k
 			return err
 		}
 
-		if errs := validation.IsValidLabelValue(string(object.GetUID())); len(errs) == 0 {
+		if errs := content.IsLabelValue(string(object.GetUID())); len(errs) == 0 {
 			if wl.Labels == nil {
 				wl.Labels = make(map[string]string, 1)
 			}
@@ -1295,7 +1318,7 @@ func ConstructWorkload(ctx context.Context, c client.Client, job GenericJob, lab
 		wl.Labels = make(map[string]string)
 	}
 	jobUID := string(job.Object().GetUID())
-	if errs := validation.IsValidLabelValue(jobUID); len(errs) == 0 {
+	if errs := content.IsLabelValue(jobUID); len(errs) == 0 {
 		wl.Labels[controllerconsts.JobUIDLabel] = jobUID
 	} else {
 		log.V(2).Info(
@@ -1646,4 +1669,32 @@ func WorkloadSliceEnabled(job GenericJob) bool {
 		return false
 	}
 	return workloadslicing.Enabled(jobObject)
+}
+
+// mergeAnnotations merges customAnnotations into the job's existing annotations.
+// It returns a new merged annotation map and true only if there are effective changes to apply.
+// The job's existing annotations are not modified.
+func mergeAnnotations(job GenericJob, customAnnotations map[string]string) (map[string]string, bool) {
+	if len(customAnnotations) == 0 {
+		return nil, false
+	}
+
+	existing := job.Object().GetAnnotations()
+
+	var merged map[string]string
+	changed := false
+
+	for k, v := range customAnnotations {
+		if cur, ok := existing[k]; !ok || cur != v {
+			if !changed {
+				merged = maps.Clone(existing)
+				if merged == nil {
+					merged = make(map[string]string)
+				}
+				changed = true
+			}
+			merged[k] = v
+		}
+	}
+	return merged, changed
 }

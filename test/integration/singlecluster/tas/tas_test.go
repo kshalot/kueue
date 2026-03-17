@@ -43,7 +43,6 @@ import (
 	"sigs.k8s.io/kueue/pkg/controller/admissionchecks/provisioning"
 	"sigs.k8s.io/kueue/pkg/controller/tas"
 	"sigs.k8s.io/kueue/pkg/features"
-	"sigs.k8s.io/kueue/pkg/util/admissioncheck"
 	utiltas "sigs.k8s.io/kueue/pkg/util/tas"
 	utiltesting "sigs.k8s.io/kueue/pkg/util/testing"
 	utiltestingapi "sigs.k8s.io/kueue/pkg/util/testing/v1beta2"
@@ -558,11 +557,10 @@ var _ = ginkgo.Describe("Topology Aware Scheduling", ginkgo.Ordered, func() {
 				clusterQueue = utiltestingapi.MakeClusterQueue("cluster-queue").
 					ResourceGroup(*utiltestingapi.MakeFlavorQuotas(tasFlavor.Name).Resource(corev1.ResourceCPU, "5").Obj()).
 					Obj()
-				util.MustCreate(ctx, k8sClient, clusterQueue)
-				util.ExpectClusterQueuesToBeActive(ctx, k8sClient, clusterQueue)
+				util.CreateClusterQueuesAndWaitForActive(ctx, k8sClient, clusterQueue)
 
 				localQueue = utiltestingapi.MakeLocalQueue("local-queue", ns.Name).ClusterQueue(clusterQueue.Name).Obj()
-				util.MustCreate(ctx, k8sClient, localQueue)
+				util.CreateLocalQueuesAndWaitForActive(ctx, k8sClient, localQueue)
 			})
 
 			ginkgo.AfterEach(func() {
@@ -575,6 +573,37 @@ var _ = ginkgo.Describe("Topology Aware Scheduling", ginkgo.Ordered, func() {
 				for _, node := range nodes {
 					util.ExpectObjectToBeDeleted(ctx, k8sClient, &node, true)
 				}
+			})
+
+			ginkgo.It("Should admit a previously inadmissible limits-only workload after another workload finishes", func() {
+				ginkgo.By("Creating a blocker workload and waiting until it reserves most of the available GPU quota")
+				blocker := utiltestingapi.MakeWorkload("blocker", ns.Name).
+					Queue(kueue.LocalQueueName(localQueue.Name)).PodSets(*utiltestingapi.MakePodSet("worker", 4).
+					PreferredTopologyRequest(utiltesting.DefaultBlockTopologyLevel).
+					Obj()).Request(corev1.ResourceCPU, "1").Obj()
+				util.MustCreate(ctx, k8sClient, blocker)
+
+				util.ExpectWorkloadsToHaveQuotaReservation(ctx, k8sClient, clusterQueue.Name, blocker)
+				util.ExpectPendingWorkloadsMetric(clusterQueue, 0, 0)
+
+				ginkgo.By("Creating a second workload with only limits so it becomes inadmissible while the blocker holds quota")
+				limitsOnly := utiltestingapi.MakeWorkload("limits-only", ns.Name).
+					Queue(kueue.LocalQueueName(localQueue.Name)).PodSets(*utiltestingapi.MakePodSet("worker", 4).
+					PreferredTopologyRequest(utiltesting.DefaultBlockTopologyLevel).
+					Obj()).Limit(corev1.ResourceCPU, "1").Obj()
+				util.MustCreate(ctx, k8sClient, limitsOnly)
+
+				util.ExpectWorkloadsToBePending(ctx, k8sClient, limitsOnly)
+				util.ExpectPendingWorkloadsMetric(clusterQueue, 0, 1)
+
+				ginkgo.By("Marking the blocker workload as finished")
+				util.FinishWorkloads(ctx, k8sClient, blocker)
+
+				ginkgo.By("Verifying that once quota is released, the previously inadmissible limits-only workload now reserves quota")
+				util.ExpectWorkloadsToHaveQuotaReservation(ctx, k8sClient, clusterQueue.Name, limitsOnly)
+
+				util.ExpectPendingWorkloadsMetric(clusterQueue, 0, 0)
+				util.ExpectReservingActiveWorkloadsMetric(clusterQueue, 1)
 			})
 
 			ginkgo.It("should not admit workload which does not fit to the required topology domain", func() {
@@ -3535,12 +3564,7 @@ var _ = ginkgo.Describe("Topology Aware Scheduling", ginkgo.Ordered, func() {
 				})
 
 				ginkgo.By("await for the check to be ready", func() {
-					gomega.Eventually(func(g gomega.Gomega) {
-						g.Expect(k8sClient.Get(ctx, wlKey, wl1)).To(gomega.Succeed())
-						state := admissioncheck.FindAdmissionCheck(wl1.Status.AdmissionChecks, kueue.AdmissionCheckReference(ac.Name))
-						g.Expect(state).NotTo(gomega.BeNil())
-						g.Expect(state.State).To(gomega.Equal(kueue.CheckStateReady))
-					}, util.Timeout, time.Millisecond).Should(gomega.Succeed())
+					util.ExpectAdmissionCheckState(ctx, k8sClient, wlKey, ac.Name, kueue.CheckStateReady)
 				})
 
 				ginkgo.By("restart Kueue manager", func() {

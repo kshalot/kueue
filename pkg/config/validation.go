@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -115,7 +116,7 @@ func validateMultiKueue(c *configapi.Configuration) field.ErrorList {
 				c.MultiKueue.WorkerLostTimeout.Duration, apimachineryvalidation.IsNegativeErrorMsg))
 		}
 		if c.MultiKueue.Origin != nil {
-			if errs := apimachineryutilvalidation.IsValidLabelValue(*c.MultiKueue.Origin); len(errs) != 0 {
+			if errs := content.IsLabelValue(*c.MultiKueue.Origin); len(errs) != 0 {
 				allErrs = append(allErrs, field.Invalid(multiKueuePath.Child("origin"), *c.MultiKueue.Origin, strings.Join(errs, ",")))
 			}
 		}
@@ -414,7 +415,7 @@ func validateDeviceClassMappings(c *configapi.Configuration) field.ErrorList {
 	for idx, mapping := range mappings {
 		mappingPath := dynamicResourceAllocationPath.Index(idx)
 
-		if errs := apimachineryutilvalidation.IsQualifiedName(string(mapping.Name)); len(errs) > 0 {
+		if errs := content.IsLabelKey(string(mapping.Name)); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(mappingPath.Child("name"), mapping.Name, strings.Join(errs, "; ")))
 		}
 
@@ -442,7 +443,7 @@ func validateDeviceClassMappings(c *configapi.Configuration) field.ErrorList {
 		for dcIdx, deviceClass := range mapping.DeviceClassNames {
 			dcPath := mappingPath.Child("deviceClassNames").Index(dcIdx)
 
-			if errs := apimachineryutilvalidation.IsQualifiedName(string(deviceClass)); len(errs) > 0 {
+			if errs := content.IsLabelKey(string(deviceClass)); len(errs) > 0 {
 				allErrs = append(allErrs, field.Invalid(dcPath, deviceClass, strings.Join(errs, "; ")))
 			}
 
@@ -604,7 +605,7 @@ func validateCustomLabels(c *configapi.Configuration) field.ErrorList {
 }
 
 func validateQualifiedName(fldPath *field.Path, value string) field.ErrorList {
-	if errs := apimachineryutilvalidation.IsQualifiedName(value); len(errs) > 0 {
+	if errs := content.IsLabelKey(value); len(errs) > 0 {
 		return field.ErrorList{field.Invalid(fldPath, value, strings.Join(errs, "; "))}
 	}
 	return nil

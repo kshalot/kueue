@@ -32,6 +32,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	kfmpi "github.com/kubeflow/mpi-operator/pkg/apis/kubeflow/v2beta1"
+	sparkv1beta2 "github.com/kubeflow/spark-operator/v2/api/v1beta2"
 	kftrainerapi "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	kftraining "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	"github.com/onsi/ginkgo/v2"
@@ -65,6 +66,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	jobset "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	leaderworkersetv1 "sigs.k8s.io/lws/api/leaderworkerset/v1"
+	"sigs.k8s.io/yaml"
 
 	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta2"
 	"sigs.k8s.io/kueue/pkg/controller/jobs/leaderworkerset"
@@ -81,6 +83,19 @@ import (
 func init() {
 	// Use large MaxLength to make sure the diff contains relevant output
 	format.MaxLength = 500000
+	format.RegisterCustomFormatter(formatK8sObject)
+}
+
+func formatK8sObject(value any) (string, bool) {
+	obj, ok := value.(client.Object)
+	if !ok {
+		return "", false
+	}
+	objYAML, err := yaml.Marshal(obj)
+	if err != nil {
+		return "", false
+	}
+	return string(objYAML), true
 }
 
 var SetupLogger = sync.OnceFunc(func() {
@@ -93,9 +108,14 @@ var SetupLoggerGetObservedLogs = sync.OnceValue(func() *observer.ObservedLogs {
 	return observedLogs
 })
 
-func assertMsg(message string, obj client.Object) func() string {
+func assertMsg[T client.Object](message string, objs ...T) func() string {
 	return func() string {
-		return message + "\n" + format.Object(obj, 1)
+		var output strings.Builder
+		fmt.Fprintln(&output, message)
+		for _, obj := range objs {
+			fmt.Fprintln(&output, format.Object(obj, 1))
+		}
+		return output.String()
 	}
 }
 
@@ -226,6 +246,10 @@ func DeleteAllRayJobsInNamespace(ctx context.Context, c client.Client, ns *corev
 	return deleteAllObjectsInNamespace(ctx, c, ns, &rayv1.RayJob{})
 }
 
+func DeleteAllSparkApplicationsInNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace) error {
+	return deleteAllObjectsInNamespace(ctx, c, ns, &sparkv1beta2.SparkApplication{})
+}
+
 func DeleteAllPodsInNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace) error {
 	return deleteAllPodsInNamespace(ctx, c, ns, 2)
 }
@@ -334,17 +358,19 @@ func ExpectWorkloadsToHaveQuotaReservation(ctx context.Context, k8sClient client
 func ExpectWorkloadsToHaveQuotaReservationByKey(ctx context.Context, k8sClient client.Client, cqName string, wlKeys ...client.ObjectKey) {
 	ginkgo.GinkgoHelper()
 	wlKeys = uniqueKeys(wlKeys)
-	wl := &kueue.Workload{}
+	wlObjects := make([]*kueue.Workload, len(wlKeys))
 	gomega.Eventually(func(g gomega.Gomega) {
 		admitted := make([]client.ObjectKey, 0, len(wlKeys))
-		for _, wlKey := range wlKeys {
+		for i, wlKey := range wlKeys {
+			wl := &kueue.Workload{}
 			g.Expect(k8sClient.Get(ctx, wlKey, wl)).To(gomega.Succeed())
 			if workload.HasQuotaReservation(wl) && string(wl.Status.Admission.ClusterQueue) == cqName {
 				admitted = append(admitted, wlKey)
 			}
+			wlObjects[i] = wl
 		}
-		g.Expect(admitted).Should(gomega.Equal(wlKeys), "Unexpected workloads were admitted")
-	}, Timeout, Interval).Should(gomega.Succeed())
+		g.Expect(admitted).Should(gomega.Equal(wlKeys))
+	}, Timeout, Interval).Should(gomega.Succeed(), assertMsg("Unexpected workloads with QuotaReservation", wlObjects...))
 }
 
 func FilterEvictedWorkloads(ctx context.Context, k8sClient client.Client, wls ...*kueue.Workload) []*kueue.Workload {
@@ -572,6 +598,47 @@ func ExpectWorkloadToBeAdmittedAs(ctx context.Context, k8sClient client.Client, 
 		g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(wl), &updatedWorkload)).To(gomega.Succeed())
 		g.Expect(updatedWorkload.Status.Admission).Should(gomega.BeComparableTo(admission))
 	}, Timeout, Interval).Should(gomega.Succeed())
+}
+
+func mustAdmissionCheckState(g gomega.Gomega, updatedWl *kueue.Workload, admissionCheckName string, expectedState kueue.CheckState, expectedMessage string, podSetUpdates ...kueue.PodSetUpdate) {
+	ginkgo.GinkgoHelper()
+	check := admissioncheck.FindAdmissionCheck(updatedWl.Status.AdmissionChecks, kueue.AdmissionCheckReference(admissionCheckName))
+	g.Expect(check).NotTo(gomega.BeNil())
+	g.Expect(check.State).To(gomega.Equal(expectedState))
+	if expectedMessage != "" {
+		g.Expect(check.Message).To(gomega.Equal(expectedMessage))
+	}
+	if len(podSetUpdates) > 0 {
+		g.Expect(check.PodSetUpdates).To(gomega.BeComparableTo(podSetUpdates))
+	}
+}
+
+func ExpectAdmissionCheckStateWithMessage(ctx context.Context, c client.Client, wlKey client.ObjectKey, admissionCheckName string, expectedState kueue.CheckState, expectedMessage string, podSetUpdates ...kueue.PodSetUpdate) {
+	ginkgo.GinkgoHelper()
+	updatedWl := &kueue.Workload{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(c.Get(ctx, wlKey, updatedWl)).To(gomega.Succeed())
+		mustAdmissionCheckState(g, updatedWl, admissionCheckName, expectedState, expectedMessage, podSetUpdates...)
+	}, MediumTimeout, Interval).Should(gomega.Succeed(), assertMsg("Message or state did not match for the admission check", updatedWl))
+}
+
+func ExpectAdmissionCheckState(ctx context.Context, c client.Client, wlKey client.ObjectKey, admissionCheckName string, expectedState kueue.CheckState, podSetUpdates ...kueue.PodSetUpdate) {
+	ginkgo.GinkgoHelper()
+	ExpectAdmissionCheckStateWithMessage(ctx, c, wlKey, admissionCheckName, expectedState, "", podSetUpdates...)
+}
+
+func ConsistentlyAdmissionCheckStateWithMessage(ctx context.Context, c client.Client, wlKey client.ObjectKey, admissionCheckName string, expectedState kueue.CheckState, expectedMessage string, podSetUpdates ...kueue.PodSetUpdate) {
+	ginkgo.GinkgoHelper()
+	updatedWl := &kueue.Workload{}
+	gomega.Consistently(func(g gomega.Gomega) {
+		g.Expect(c.Get(ctx, wlKey, updatedWl)).To(gomega.Succeed())
+		mustAdmissionCheckState(g, updatedWl, admissionCheckName, expectedState, expectedMessage, podSetUpdates...)
+	}, ConsistentDuration, ShortInterval).Should(gomega.Succeed(), assertMsg("Message or state did not match for the admission check", updatedWl))
+}
+
+func ConsistentlyAdmissionCheckState(ctx context.Context, c client.Client, wlKey client.ObjectKey, admissionCheckName string, expectedState kueue.CheckState, podSetUpdates ...kueue.PodSetUpdate) {
+	ginkgo.GinkgoHelper()
+	ConsistentlyAdmissionCheckStateWithMessage(ctx, c, wlKey, admissionCheckName, expectedState, "", podSetUpdates...)
 }
 
 func SetQuotaReservation(ctx context.Context, k8sClient client.Client, wlKey client.ObjectKey, admission *kueue.Admission) {
