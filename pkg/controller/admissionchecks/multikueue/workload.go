@@ -517,7 +517,7 @@ func (w *wlReconciler) reconcileGroup(ctx context.Context, group *wlGroup) (reco
 	// 7. Open the preemption gate if applicable
 	var requeueAfterSynchronize time.Duration
 	if features.Enabled(features.MultiKueueOrchestratedPreemption) {
-		remWlName, requeueIn := w.workloadToOpenPreemptionGate(group)
+		remWlName, requeueIn := w.workloadToOpenPreemptionGate(ctx, group)
 		if remWlName != nil {
 			remWl := group.remotes[*remWlName]
 			remClient := group.remoteClients[*remWlName]
@@ -1026,36 +1026,44 @@ func updateDelayedTopologyRequest(local, remote *kueue.Workload) {
 	}
 }
 
-func (w *wlReconciler) workloadToOpenPreemptionGate(group *wlGroup) (*string, time.Duration) {
+func (w *wlReconciler) workloadToOpenPreemptionGate(ctx context.Context, group *wlGroup) (*string, time.Duration) {
+	log := ctrl.LoggerFrom(ctx).WithValues("op", "workloadToOpenPreemptionGate")
+
 	var previousUngateTime *metav1.Time
 	var oldestPreemptionSignalTime *metav1.Time
 	var workloadToUngateClusterName *string
 
 	for clusterName, wl := range group.remotes {
+		remoteWlLog := log.WithValues("remoteCluster", clusterName, "remoteWorkload", klog.KObj(wl))
 		if wl == nil {
 			continue
 		}
-
 		openMkGateStateIdx := slices.IndexFunc(wl.Status.PreemptionGates, func(gate kueue.PreemptionGateState) bool {
 			return gate.Name == constants.MultiKueuePreemptionGate && gate.Position == kueue.PreemptionGatePositionOpen
 		})
 		if openMkGateStateIdx == -1 {
+			remoteWlLog.V(4).Info("Remote workload does not have an open preemption gate")
 			preemptionSignalCond := apimeta.FindStatusCondition(wl.Status.Conditions, kueue.WorkloadBlockedOnPreemptionGates)
 			wlRequiresPreemption := preemptionSignalCond != nil && preemptionSignalCond.Status == metav1.ConditionTrue
 			if !wlRequiresPreemption {
+				remoteWlLog.V(4).Info("Remote workload does not require preemption")
 				continue
 			}
 			wlHasOlderPreemptionSignal := oldestPreemptionSignalTime == nil || preemptionSignalCond.LastTransitionTime.Before(oldestPreemptionSignalTime)
 			if !wlHasOlderPreemptionSignal {
+				remoteWlLog.V(4).Info("Remote workload was not the first to require preemption")
 				continue
 			}
 
+			remoteWlLog.V(4).Info("Remote workload is the new candidate for ungating")
 			workloadToUngateClusterName = &clusterName
 			oldestPreemptionSignalTime = &preemptionSignalCond.LastTransitionTime
 		} else {
+			remoteWlLog.V(4).Info("Remote workload has an open preemption gate")
 			openMkGateState := wl.Status.PreemptionGates[openMkGateStateIdx]
 			gateOpenedTime := openMkGateState.LastTransitionTime
 			if previousUngateTime == nil || gateOpenedTime.After(previousUngateTime.Time) {
+				remoteWlLog.V(4).Info("Remote workload has the new latest preemption ungating time")
 				previousUngateTime = &gateOpenedTime
 			}
 		}
@@ -1070,11 +1078,14 @@ func (w *wlReconciler) workloadToOpenPreemptionGate(group *wlGroup) (*string, ti
 	timeLeftInTimeout := singleClusterPreemptionTimeout - timeSinceUngate
 
 	if workloadToUngateClusterName == nil {
+		log.V(4).Info("No candidate workload found for ungating preemptions")
 		return nil, 0
 	}
 	if previousUngateTime != nil && timeLeftInTimeout > 0 {
+		log.V(4).Info("Single preemption timeout did not expire", "timeLeft", timeLeftInTimeout, "nextRemoteToUngate", workloadToUngateClusterName)
 		return nil, timeLeftInTimeout
 	}
+	log.V(4).Info("Found workload to ungate", "remoteToUngate", workloadToUngateClusterName)
 	return workloadToUngateClusterName, singleClusterPreemptionTimeout
 }
 
