@@ -8122,7 +8122,7 @@ func TestSchedule(t *testing.T) {
 				utiltesting.MakeEventRecord("default", "fs-high-pob", "Pending", corev1.EventTypeWarning).Obj(),
 			},
 		},
-		"block preemptions when a preemption gate is present": {
+		"block preemptions and signal `BlockedOnPreemptionGates` when a preemption gate is present": {
 			enableMultiKueueOrchestratedPreemption: true,
 			workloads: []kueue.Workload{
 				*utiltestingapi.MakeWorkload("preemptor", "eng-beta").
@@ -8184,6 +8184,123 @@ func TestSchedule(t *testing.T) {
 			},
 			wantAssignments: map[workload.Reference]kueue.Admission{
 				"eng-beta/low-priority": {
+					ClusterQueue: "eng-beta",
+					PodSetAssignments: []kueue.PodSetAssignment{
+						utiltestingapi.MakePodSetAssignment("main").
+							Assignment("example.com/gpu", "model-a", "20").
+							Obj(),
+					},
+				},
+			},
+			wantLeft: map[kueue.ClusterQueueReference][]workload.Reference{
+				"eng-beta": {"eng-beta/preemptor"},
+			},
+		},
+		"do not signal `BlockedOnPreemptionGates` when a preemption gate is present, but the workload fits without preemption": {
+			enableMultiKueueOrchestratedPreemption: true,
+			workloads: []kueue.Workload{
+				*utiltestingapi.MakeWorkload("preemptor", "eng-beta").
+					UID("wl-preemptor").
+					JobUID("job-preemptor").
+					Queue("main").
+					Request("example.com/gpu", "20").
+					PreemptionGates(kueue.PreemptionGate{Name: "gate"}).
+					Obj(),
+			},
+			wantWorkloads: []kueue.Workload{
+				*utiltestingapi.MakeWorkload("preemptor", "eng-beta").
+					UID("wl-preemptor").
+					JobUID("job-preemptor").
+					Queue("main").
+					Request("example.com/gpu", "20").
+					PreemptionGates(kueue.PreemptionGate{Name: "gate"}).
+					ReserveQuotaAt(utiltestingapi.MakeAdmission("eng-beta").
+						PodSets(utiltestingapi.MakePodSetAssignment(kueue.DefaultPodSetName).
+							Assignment("example.com/gpu", "model-a", "20").
+							Obj()).
+						Obj(), now).
+					Condition(metav1.Condition{
+						Type:               kueue.WorkloadAdmitted,
+						Status:             metav1.ConditionTrue,
+						Reason:             "Admitted",
+						Message:            "The workload is admitted",
+						LastTransitionTime: metav1.NewTime(now),
+					}).
+					Condition(metav1.Condition{
+						Type:               kueue.WorkloadQuotaReserved,
+						Status:             metav1.ConditionTrue,
+						Reason:             "QuotaReserved",
+						Message:            "Quota reserved in ClusterQueue eng-beta",
+						LastTransitionTime: metav1.NewTime(now),
+					}).
+					Obj(),
+			},
+			wantAssignments: map[workload.Reference]kueue.Admission{
+				"eng-beta/preemptor": {
+					ClusterQueue: "eng-beta",
+					PodSetAssignments: []kueue.PodSetAssignment{
+						utiltestingapi.MakePodSetAssignment("main").
+							Assignment("example.com/gpu", "model-a", "20").
+							Obj(),
+					},
+				},
+			},
+		},
+		"do not signal `BlockedOnPreemptionGates` when a preemption gate is present, but the workload had nothing to preempt": {
+			enableMultiKueueOrchestratedPreemption: true,
+			workloads: []kueue.Workload{
+				*utiltestingapi.MakeWorkload("preemptor", "eng-beta").
+					UID("wl-preemptor").
+					JobUID("job-preemptor").
+					Queue("main").
+					Request("example.com/gpu", "20").
+					PreemptionGates(kueue.PreemptionGate{Name: "gate"}).
+					Obj(),
+				*utiltestingapi.MakeWorkload("high-priority", "eng-beta").
+					UID("high-priority").
+					Priority(1).
+					Request("example.com/gpu", "20").
+					ReserveQuotaAt(utiltestingapi.MakeAdmission("eng-beta").
+						PodSets(utiltestingapi.MakePodSetAssignment(kueue.DefaultPodSetName).
+							Assignment("example.com/gpu", "model-a", "20").
+							Obj()).
+						Obj(), now).
+					Obj(),
+			},
+			wantWorkloads: []kueue.Workload{
+				*utiltestingapi.MakeWorkload("high-priority", "eng-beta").
+					UID("high-priority").
+					Priority(1).
+					Request("example.com/gpu", "20").
+					ReserveQuotaAt(utiltestingapi.MakeAdmission("eng-beta").
+						PodSets(utiltestingapi.MakePodSetAssignment(kueue.DefaultPodSetName).
+							Assignment("example.com/gpu", "model-a", "20").
+							Obj()).
+						Obj(), now).
+					Obj(),
+				*utiltestingapi.MakeWorkload("preemptor", "eng-beta").
+					UID("wl-preemptor").
+					JobUID("job-preemptor").
+					Queue("main").
+					Request("example.com/gpu", "20").
+					PreemptionGates(kueue.PreemptionGate{Name: "gate"}).
+					Condition(metav1.Condition{
+						Type:               kueue.WorkloadQuotaReserved,
+						Status:             metav1.ConditionFalse,
+						Reason:             "Pending",
+						Message:            "couldn't assign flavors to pod set main: insufficient unused quota for example.com/gpu in flavor model-a, 20 more needed",
+						LastTransitionTime: metav1.NewTime(now),
+					}).
+					ResourceRequests(kueue.PodSetRequest{
+						Name: "main",
+						Resources: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("20"),
+						},
+					}).
+					Obj(),
+			},
+			wantAssignments: map[workload.Reference]kueue.Admission{
+				"eng-beta/high-priority": {
 					ClusterQueue: "eng-beta",
 					PodSetAssignments: []kueue.PodSetAssignment{
 						utiltestingapi.MakePodSetAssignment("main").
