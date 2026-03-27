@@ -76,6 +76,7 @@ import (
 	utillogging "sigs.k8s.io/kueue/pkg/util/logging"
 	utiltas "sigs.k8s.io/kueue/pkg/util/tas"
 	utiltesting "sigs.k8s.io/kueue/pkg/util/testing"
+	testingjob "sigs.k8s.io/kueue/pkg/util/testingjobs/job"
 	"sigs.k8s.io/kueue/pkg/workload"
 	"sigs.k8s.io/kueue/pkg/workloadslicing"
 )
@@ -1305,4 +1306,38 @@ func IgnoreConflict(err error) error {
 		return nil
 	}
 	return err
+}
+func ExpectNodeToBecomeReady(ctx context.Context, c client.Client, nodeName string, localQueue *kueue.LocalQueue) {
+	ginkgo.GinkgoHelper()
+
+	node := &corev1.Node{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(c.Get(ctx, client.ObjectKey{Name: nodeName}, node)).To(gomega.Succeed())
+		g.Expect(utiltas.IsNodeStatusConditionTrue(node.Status.Conditions, corev1.NodeReady)).To(gomega.BeTrue())
+	}, Timeout, Interval).Should(gomega.Succeed())
+
+	waitForDummyWorkloadToRunOnNode(ctx, c, node, localQueue)
+}
+
+func waitForDummyWorkloadToRunOnNode(ctx context.Context, c client.Client, node *corev1.Node, lq *kueue.LocalQueue) {
+	ginkgo.GinkgoHelper()
+
+	ginkgo.By(fmt.Sprintf("Waiting for a dummy workload to run on the recovered node %s", node.Name), func() {
+		dummyJob := testingjob.MakeJob(fmt.Sprintf("dummy-job-%s", node.Name), lq.Namespace).
+			Queue(kueue.LocalQueueName(lq.Name)).
+			NodeSelector(corev1.LabelHostname, node.Name).
+			Image(GetAgnHostImage(), BehaviorExitFast).
+			Obj()
+
+		MustCreate(ctx, c, dummyJob)
+
+		gomega.Eventually(func(g gomega.Gomega) {
+			var createdDummyJob batchv1.Job
+			g.Expect(c.Get(ctx, client.ObjectKeyFromObject(dummyJob), &createdDummyJob)).To(gomega.Succeed())
+			g.Expect(createdDummyJob.Status.Conditions).To(gomega.ContainElement(gomega.BeComparableTo(batchv1.JobCondition{
+				Type:   batchv1.JobComplete,
+				Status: corev1.ConditionTrue,
+			}, cmpopts.IgnoreFields(batchv1.JobCondition{}, "LastTransitionTime", "LastProbeTime", "Reason", "Message"))))
+		}, MediumTimeout, Interval).Should(gomega.Succeed())
+	})
 }
