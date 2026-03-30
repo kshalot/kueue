@@ -60,7 +60,12 @@ KIND_CLUSTER_NAME ?= kind
 # Number of processes to use during e2e tests.
 E2E_NPROCS ?= 1
 
-GINKGO_ARGS += $(if $(filter-out 1,$(E2E_NPROCS)),-procs=$(E2E_NPROCS))
+# Inject the number of procs into GINKGO_ARGS
+GINKGO_PROC_ARG := $(if $(filter-out 1,$(E2E_NPROCS)),-procs=$(E2E_NPROCS))
+# Check empty string to avoid adding a trailing space
+ifneq ($(GINKGO_PROC_ARG),)
+    GINKGO_ARGS += $(GINKGO_PROC_ARG)
+endif
 
 # For restricting to a specific directory
 GO_TEST_TARGET ?= .
