@@ -18,6 +18,7 @@ package multikueue
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -631,20 +632,47 @@ var _ = ginkgo.Describe("MultiKueue with scheduler", ginkgo.Label("area:multikue
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
+			var (
+				evictedWorkload *kueue.Workload
+				evictedCluster  cluster
+				otherWorkload   *kueue.Workload
+				otherCluster    cluster
+			)
+
 			ginkgo.By("Checking that only one low-priority workload was preempted and requeued", func() {
-				gomega.Consistently(func(g gomega.Gomega) {
+				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(worker1TestCluster.client.Get(worker1TestCluster.ctx, lowWlKey1, workerLowWl1)).To(gomega.Succeed())
 					g.Expect(worker2TestCluster.client.Get(worker2TestCluster.ctx, lowWlKey2, workerLowWl2)).To(gomega.Succeed())
 
-					var evictedWorkload *kueue.Workload
-					var otherWorkload *kueue.Workload
 					if workload.IsEvicted(workerLowWl1) {
 						evictedWorkload = workerLowWl1
+						evictedCluster = worker1TestCluster
 						otherWorkload = workerLowWl2
-					} else {
+						otherCluster = worker2TestCluster
+					} else if workload.IsEvicted(workerLowWl2) {
 						evictedWorkload = workerLowWl2
+						evictedCluster = worker2TestCluster
 						otherWorkload = workerLowWl1
+						otherCluster = worker1TestCluster
+					} else {
+						ginkgo.Fail(fmt.Sprintf("Neither low-priority workload was evicted.\nWorkload 1: %v\nWorkload 2: %v", workerLowWl1, workerLowWl2))
 					}
+
+					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadEvicted))
+					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadPreempted))
+					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadRequeued))
+
+					g.Expect(otherWorkload.Status.Conditions).NotTo(testing.HaveConditionStatusTrue(kueue.WorkloadEvicted))
+					g.Expect(otherWorkload.Status.Conditions).NotTo(testing.HaveConditionStatusTrue(kueue.WorkloadPreempted))
+					g.Expect(otherWorkload.Status.Conditions).NotTo(testing.HaveConditionStatusTrue(kueue.WorkloadRequeued))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Checking that the evicted workload is not admitted again and the other one does not get evicted", func() {
+				gomega.Consistently(func(g gomega.Gomega) {
+					g.Expect(evictedCluster.client.Get(evictedCluster.ctx, client.ObjectKeyFromObject(evictedWorkload), evictedWorkload)).To(gomega.Succeed())
+					g.Expect(otherCluster.client.Get(otherCluster.ctx, client.ObjectKeyFromObject(otherWorkload), otherWorkload)).To(gomega.Succeed())
+
 					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadEvicted))
 					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadPreempted))
 					g.Expect(evictedWorkload.Status.Conditions).To(testing.HaveConditionStatusTrue(kueue.WorkloadRequeued))
