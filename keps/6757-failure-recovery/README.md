@@ -33,7 +33,9 @@
 ## Summary
 
 This KEP introduces an opt-in mechanism of timeout-based graceful handling of zombie pods,
-i.e. pods that cannot be fully deleted and remain stuck on the cluster due to a node-level failure, regardless of their operational phase.
+i.e. pods that cannot be fully deleted and remain stuck on the cluster due to a node-level failure regardless of their operational phase.
+In this KEP, "unhealthy" nodes are defined as those tainted with `node.kubernetes.io/unreachable`,
+which typically occurs due to a network partition or an unresponsive kubelet service.
 
 ## Motivation
 
