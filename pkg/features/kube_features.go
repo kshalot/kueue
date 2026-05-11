@@ -176,7 +176,7 @@ const (
 	// kep: https://github.com/kubernetes-sigs/kueue/tree/main/keps/2941-DRA
 	//
 	// Enable quota accounting for Dynamic Resource Allocation (DRA) devices in workloads
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
+	DynamicResourceAllocation featuregate.Feature = "KueueDynamicResourceAllocation"
 
 	// owner: @sohankunkerkar
 	// kep: https://github.com/kubernetes-sigs/kueue/tree/main/keps/2941-DRA

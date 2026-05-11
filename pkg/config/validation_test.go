@@ -1182,7 +1182,7 @@ func TestValidateFeatureGates(t *testing.T) {
 				},
 			},
 		},
-		"DRAExtendedResources requires DynamicResourceAllocation": {
+		"DRAExtendedResources requires KueueDynamicResourceAllocation": {
 			featureGates: map[featuregate.Feature]bool{
 				features.DRAExtendedResources:      true,
 				features.DynamicResourceAllocation: false,
@@ -1191,7 +1191,7 @@ func TestValidateFeatureGates(t *testing.T) {
 				&field.Error{
 					Type:   field.ErrorTypeInvalid,
 					Field:  "featureGates",
-					Detail: "DRAExtendedResources requires DynamicResourceAllocation to be enabled",
+					Detail: "DRAExtendedResources requires KueueDynamicResourceAllocation to be enabled",
 				},
 			},
 		},
