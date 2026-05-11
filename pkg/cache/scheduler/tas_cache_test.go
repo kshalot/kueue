@@ -50,6 +50,7 @@ type PodSetTestCase struct {
 	previousAssignment *kueue.TopologyAssignment
 	wantAssignment     *tas.TopologyAssignment
 	wantReason         string
+	wantReasonWAS      string
 }
 
 func TestFindTopologyAssignments(t *testing.T) {
@@ -1595,6 +1596,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 				},
 				count:      1,
 				wantReason: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: taint "example.com/gpu=present:NoSchedule": 1`,
+				wantReasonWAS: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: WAS check failed: 1`,
 			}},
 		},
 		"detailed failure message with exclusion stats": {
@@ -1653,6 +1655,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 				},
 				count:      1,
 				wantReason: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 4; excluded: nodeSelector: 2, resource "cpu": 1, taint "key=value:NoSchedule": 1`,
+				wantReasonWAS: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 4; excluded: WAS check failed: 3, resource "cpu": 1`,
 			}},
 		},
 		"resource exclusion picks most restrictive resource": {
@@ -1792,6 +1795,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 				},
 				count:      1,
 				wantReason: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: nodeSelector: 1`,
+				wantReasonWAS: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: WAS check failed: 1`,
 				nodeSelector: map[string]string{
 					"custom-label-1": "custom-value-1",
 				},
@@ -1824,6 +1828,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 				},
 				count:      1,
 				wantReason: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: nodeSelector: 1`,
+				wantReasonWAS: `topology "default" doesn't allow to fit any of 1 pod(s). Total nodes: 1; excluded: WAS check failed: 1`,
 				nodeSelector: map[string]string{
 					"custom-label-1": "value-2",
 				},
@@ -5518,6 +5523,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 					},
 					count:      1,
 					wantReason: "topology \"default\" doesn't allow to fit any of 1 pod(s). Total nodes: 2; excluded: nodeSelector: 2",
+					wantReasonWAS: "topology \"default\" doesn't allow to fit any of 1 pod(s). Total nodes: 2; excluded: WAS check failed: 2",
 				},
 			},
 		},
@@ -6265,11 +6271,13 @@ func TestFindTopologyAssignments(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			ctx, log := utiltesting.ContextWithLog(t)
-			features.SetFeatureGatesDuringTest(t, tc.featureGates)
+		for _, wasEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s with WAS enabled: %t", name, wasEnabled), func(t *testing.T) {
+				ctx, log := utiltesting.ContextWithLog(t)
+				features.SetFeatureGatesDuringTest(t, tc.featureGates)
+				features.SetFeatureGateDuringTest(t, features.WorkloadAwareScheduler, wasEnabled)
 
-			initialObjects := make([]client.Object, 0)
+				initialObjects := make([]client.Object, 0)
 			for i := range tc.nodes {
 				initialObjects = append(initialObjects, &tc.nodes[i])
 			}
@@ -6327,6 +6335,9 @@ func TestFindTopologyAssignments(t *testing.T) {
 				wantPodSetResult := tasPodSetAssignmentResult{
 					FailureReason: ps.wantReason,
 				}
+				if wasEnabled && ps.wantReasonWAS != "" {
+					wantPodSetResult.FailureReason = ps.wantReasonWAS
+				}
 				if ps.wantAssignment != nil {
 					wantPodSetResult.TopologyAssignment = ps.wantAssignment
 				}
@@ -6337,6 +6348,7 @@ func TestFindTopologyAssignments(t *testing.T) {
 				t.Errorf("unexpected topology assignment (-want,+got): %s", diff)
 			}
 		})
+		}
 	}
 }
 
@@ -6625,9 +6637,11 @@ func TestFindTopologyAssignmentsMultiLayerReplacement(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			features.SetFeatureGateDuringTest(t, features.TASMultiLayerTopology, true)
-			ctx, log := utiltesting.ContextWithLog(t)
+		for _, wasEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s with WAS enabled: %t", name, wasEnabled), func(t *testing.T) {
+				features.SetFeatureGateDuringTest(t, features.WorkloadAwareScheduler, wasEnabled)
+				features.SetFeatureGateDuringTest(t, features.TASMultiLayerTopology, true)
+				ctx, log := utiltesting.ContextWithLog(t)
 
 			wl := utiltestingapi.MakeWorkload("test-wl", "test-ns").
 				Admission(utiltestingapi.MakeAdmission("test-cq", podSetName).
@@ -6697,5 +6711,6 @@ func TestFindTopologyAssignmentsMultiLayerReplacement(t *testing.T) {
 				t.Errorf("unexpected topology assignment (-want,+got):\n%s", diff)
 			}
 		})
+		}
 	}
 }

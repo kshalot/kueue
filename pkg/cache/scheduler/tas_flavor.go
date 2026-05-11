@@ -26,9 +26,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kueue "sigs.k8s.io/kueue/apis/kueue/v1beta2"
+	"sigs.k8s.io/kueue/pkg/features"
 	"sigs.k8s.io/kueue/pkg/resources"
 	utiltas "sigs.k8s.io/kueue/pkg/util/tas"
 	"sigs.k8s.io/kueue/pkg/workload"
+
+	"context"
+	"k8s.io/apimachinery/pkg/runtime"
+	framework "k8s.io/kube-scheduler/framework"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	cache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	fwkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	schedulerMetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"sigs.k8s.io/scheduler-library/pkg/snapshot"
 )
 
 // usageOp indicates whether we should add or subtract the usage.
@@ -40,6 +56,8 @@ const (
 	// subtract usage from the cache
 	subtract
 )
+
+var importMetricsOnce sync.Once
 
 func (u usageOp) asSignedOne() int {
 	if u == add {
@@ -120,21 +138,88 @@ func (c *TASFlavorCache) snapshot(log logr.Logger, nodes []*nodeInfo) *TASFlavor
 	defer c.RUnlock()
 	log.V(3).Info("Constructing TAS snapshot", "nodeLabels", c.flavor.NodeLabels,
 		"levels", c.topology.Levels, "nodeCount", len(nodes))
-	snapshot := newTASFlavorSnapshot(log, c.flavor.TopologyName, c.topology.Levels, c.flavor.Tolerations)
+
+	var wasSnapshot *snapshot.ClusterSnapshot
+	if features.Enabled(features.WorkloadAwareScheduler) {
+		importMetricsOnce.Do(func() {
+			schedulerMetrics.Register()
+		})
+		var v1Nodes []*corev1.Node
+		for _, n := range nodes {
+			v1Nodes = append(v1Nodes, n.toNode())
+		}
+		upstreamCache := cache.NewSnapshot(nil, v1Nodes)
+
+		registry := fwkruntime.Registry{
+			tainttoleration.Name: func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				return tainttoleration.New(ctx, obj, handle, feature.Features{})
+			},
+			nodeaffinity.Name: func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				var args runtime.Object
+				if obj != nil {
+					args = obj
+				} else {
+					args = &schedulerconfig.NodeAffinityArgs{}
+				}
+				return nodeaffinity.New(ctx, args, handle, feature.Features{})
+			},
+			queuesort.Name: func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				return queuesort.New(ctx, obj, handle)
+			},
+			defaultbinder.Name: func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+				return defaultbinder.New(ctx, obj, handle)
+			},
+		}
+
+		cfg := &schedulerconfig.KubeSchedulerProfile{
+			SchedulerName: "default-scheduler",
+			Plugins: &schedulerconfig.Plugins{
+				QueueSort: schedulerconfig.PluginSet{
+					Enabled: []schedulerconfig.Plugin{{Name: queuesort.Name}},
+				},
+				Bind: schedulerconfig.PluginSet{
+					Enabled: []schedulerconfig.Plugin{{Name: defaultbinder.Name}},
+				},
+				Filter: schedulerconfig.PluginSet{
+					Enabled: []schedulerconfig.Plugin{
+						{Name: tainttoleration.Name},
+						{Name: nodeaffinity.Name},
+					},
+				},
+				PreFilter: schedulerconfig.PluginSet{
+					Enabled: []schedulerconfig.Plugin{
+						{Name: nodeaffinity.Name},
+					},
+				},
+			},
+		}
+
+		fwk, err := fwkruntime.NewFramework(context.Background(), registry, cfg, fwkruntime.WithSnapshotSharedLister(upstreamCache))
+		if err != nil {
+			log.Error(err, "Failed to initialize scheduler framework for TAS WAS integration")
+		} else {
+			pm := profile.Map{
+				"default-scheduler": fwk,
+			}
+			wasSnapshot = snapshot.NewClusterSnapshot(upstreamCache, pm)
+		}
+	}
+
+	snap := newTASFlavorSnapshot(log, c.flavor.TopologyName, c.topology.Levels, c.flavor.Tolerations, wasSnapshot)
 	nodeToDomain := make(map[string]utiltas.TopologyDomainID)
 	for _, node := range nodes {
-		nodeToDomain[node.Name] = snapshot.addNode(node)
+		nodeToDomain[node.Name] = snap.addNode(node)
 	}
-	snapshot.initialize()
+	snap.initialize()
 	for domainID, usage := range c.usage {
-		snapshot.addTASUsage(domainID, usage)
+		snap.addTASUsage(domainID, usage)
 	}
 	for nodeName, usage := range c.nonTasUsageCache.usagePerNode() {
 		if domainID, ok := nodeToDomain[nodeName]; ok {
-			snapshot.addNonTASUsage(domainID, usage)
+			snap.addNonTASUsage(domainID, usage)
 		}
 	}
-	return snapshot
+	return snap
 }
 
 func (c *TASFlavorCache) addUsage(key workload.Reference, topologyRequests []workload.TopologyDomainRequests) {
