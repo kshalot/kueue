@@ -61,7 +61,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.3 // indirect
-	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -145,7 +145,7 @@ require (
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
@@ -173,10 +173,10 @@ require (
 	sigs.k8s.io/kustomize/api v0.21.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/scheduler-plugins v0.34.1-devel // indirect
+	sigs.k8s.io/scheduler-plugins v0.34.4-devel-sg // indirect
 	volcano.sh/apis v1.14.0 // indirect
 )
 
 replace sigs.k8s.io/scheduler-library => github.com/vshkrabkov/scheduler-library v0.0.0-20260511103020-a11e5ba17a0d
 
-replace github.com/kubeflow/trainer/v2 => ./scratch/trainer
+replace github.com/kubeflow/trainer/v2 => github.com/kubeflow/trainer/v2 v2.0.0-20260509173935-85bbe58d0a0a
