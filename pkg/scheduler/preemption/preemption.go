@@ -243,7 +243,7 @@ func (p *Preemptor) IssuePreemptions(
 			"preemptorPath", preemptorPath, "preempteePath", preempteePath,
 			"preemptorEffectivePriority", preemptorEffPri, "preemptorBoost", preemptorBoost,
 			"targetEffectivePriority", targetEffPri, "targetBoost", targetBoost)
-		p.recorder.Eventf(target.WorkloadInfo.Obj, corev1.EventTypeNormal, "Preempted", message+
+		p.recorder.Eventf(target.WorkloadInfo.Obj, corev1.EventTypeNormal, "Preempted", "%s", message+
 			fmt.Sprintf("; preemptor effective priority: %d (base: %d, boost: %d); preemptee effective priority: %d (base: %d, boost: %d)",
 				preemptorEffPri, preemptorBase, preemptorBoost, targetEffPri, targetBase, targetBoost))
 		p.recorder.Eventf(preemptor.Obj, corev1.EventTypeNormal, "PreemptedWorkload",

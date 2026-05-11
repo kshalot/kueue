@@ -949,7 +949,7 @@ func (s *Scheduler) requeueAndUpdate(ctx context.Context, e entry) {
 	if s.queues.QueueSecondPassIfNeeded(ctx, e.Obj, e.SecondPassIteration) {
 		log.V(2).
 			Info("Workload re-queued for second pass", "workload", klog.KObj(e.Obj), "clusterQueue", klog.KRef("", string(e.ClusterQueue)), "queue", klog.KRef(e.Obj.Namespace, string(e.Obj.Spec.QueueName)), "requeueReason", e.requeueReason, "status", e.status)
-		s.recorder.Eventf(e.Obj, corev1.EventTypeWarning, "SecondPassFailed", api.TruncateEventMessage(e.inadmissibleMsg))
+		s.recorder.Eventf(e.Obj, corev1.EventTypeWarning, "SecondPassFailed", "%s", api.TruncateEventMessage(e.inadmissibleMsg))
 		return
 	}
 
@@ -970,7 +970,7 @@ func (s *Scheduler) requeueAndUpdate(ctx context.Context, e entry) {
 		}, workload.WithLooseOnApply(), workload.WithRetryOnConflictForPatch()); err != nil {
 			log.Error(err, "Could not update Workload status")
 		}
-		s.recorder.Eventf(e.Obj, corev1.EventTypeWarning, "Pending", api.TruncateEventMessage(e.inadmissibleMsg))
+		s.recorder.Eventf(e.Obj, corev1.EventTypeWarning, "Pending", "%s", api.TruncateEventMessage(e.inadmissibleMsg))
 	}
 }
 
@@ -1055,7 +1055,7 @@ func (s *Scheduler) replaceWorkloadSlice(ctx context.Context, oldQueue kueue.Clu
 	}
 
 	log.V(3).Info("Replaced", "old slice", klog.KObj(oldSlice), "new slice", klog.KObj(newSlice), "reason", reason, "message", message, "old-queue", klog.KRef("", string(oldQueue)))
-	s.recorder.Eventf(oldSlice, corev1.EventTypeNormal, reason, message)
+	s.recorder.Eventf(oldSlice, corev1.EventTypeNormal, reason, "%s", message)
 	metrics.ReportReplacedWorkloadSlices(oldQueue, s.customLabels.CQGet(oldQueue), s.roleTracker)
 	return nil
 }

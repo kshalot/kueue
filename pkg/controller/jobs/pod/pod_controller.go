@@ -789,7 +789,7 @@ func (p *Pod) validatePodGroupMetadata(r record.EventRecorder, activePods []core
 
 	if !useFastAdmission && len(activePods) < groupTotalCount {
 		errMsg := fmt.Sprintf("'%s' group has fewer runnable pods than expected", podGroupName(p.pod))
-		r.Eventf(p.Object(), corev1.EventTypeWarning, jobframework.ReasonErrWorkloadCompose, errMsg)
+		r.Eventf(p.Object(), corev1.EventTypeWarning, jobframework.ReasonErrWorkloadCompose, "%s", errMsg)
 		return jobframework.UnretryableError(errMsg)
 	}
 
@@ -1023,7 +1023,7 @@ func (p *Pod) EnsureWorkloadOwnedByAllMembers(ctx context.Context, c client.Clie
 		log.V(4).Info("Adding owner references for workload", "count", addedOwnersCnt)
 		err := c.Update(ctx, workload)
 		if err == nil {
-			r.Eventf(workload, corev1.EventTypeNormal, ReasonOwnerReferencesAdded, fmt.Sprintf("Added %d owner reference(s)", addedOwnersCnt))
+			r.Eventf(workload, corev1.EventTypeNormal, ReasonOwnerReferencesAdded, "Added %d owner reference(s)", addedOwnersCnt)
 		}
 		return err
 	}
@@ -1087,7 +1087,7 @@ func (p *Pod) ConstructComposableWorkload(ctx context.Context, c client.Client, 
 	podSets, err := jobframework.JobPodSets(ctx, p)
 	if err != nil {
 		if jobframework.IsUnretryableError(err) {
-			r.Eventf(p.Object(), corev1.EventTypeWarning, jobframework.ReasonErrWorkloadCompose, err.Error())
+			r.Eventf(p.Object(), corev1.EventTypeWarning, jobframework.ReasonErrWorkloadCompose, "%s", err.Error())
 		}
 		return nil, err
 	}

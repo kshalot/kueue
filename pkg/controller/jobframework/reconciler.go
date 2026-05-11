@@ -371,7 +371,7 @@ func (r *JobReconciler) ReconcileGenericJob(ctx context.Context, req ctrl.Reques
 		if err != nil {
 			if errors.Is(err, ErrManagedOwnersChainLimitReached) {
 				errMsg := fmt.Sprintf("Terminated search for Kueue-managed Job because ancestor depth exceeded limit of %d", managedOwnersChainLimit)
-				r.record.Eventf(object, corev1.EventTypeWarning, ReasonJobNestingTooDeep, errMsg)
+				r.record.Eventf(object, corev1.EventTypeWarning, ReasonJobNestingTooDeep, "%s", errMsg)
 				log.Error(err, errMsg)
 			}
 			return ctrl.Result{}, err
@@ -735,10 +735,10 @@ func (r *JobReconciler) recordAdmissionCheckUpdate(wl *kueue.Workload, job Gener
 	if message != "" {
 		if cJob, isComposable := job.(ComposableJob); isComposable {
 			cJob.ForEach(func(obj runtime.Object) {
-				r.record.Eventf(obj, corev1.EventTypeNormal, ReasonUpdatedAdmissionCheck, message)
+				r.record.Eventf(obj, corev1.EventTypeNormal, ReasonUpdatedAdmissionCheck, "%s", message)
 			})
 		} else {
-			r.record.Eventf(object, corev1.EventTypeNormal, ReasonUpdatedAdmissionCheck, message)
+			r.record.Eventf(object, corev1.EventTypeNormal, ReasonUpdatedAdmissionCheck, "%s", message)
 		}
 	}
 }

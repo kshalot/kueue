@@ -401,7 +401,7 @@ func (w *wlReconciler) reconcileGroup(ctx context.Context, group *wlGroup) (reco
 				return reconcile.Result{}, err
 			}
 
-			w.recorder.Eventf(group.local, corev1.EventTypeNormal, "MultiKueue", acs.Message)
+			w.recorder.Eventf(group.local, corev1.EventTypeNormal, "MultiKueue", "%s", acs.Message)
 			return reconcile.Result{}, nil
 		}
 	}
@@ -1000,7 +1000,7 @@ func (w *wlReconciler) syncReservingRemoteState(ctx context.Context, group *wlGr
 	}
 
 	if needsACUpdate {
-		w.recorder.Eventf(group.local, corev1.EventTypeNormal, "MultiKueue", acs.Message)
+		w.recorder.Eventf(group.local, corev1.EventTypeNormal, "MultiKueue", "%s", acs.Message)
 		w.enqueueComponentWorkloads(ctx, group.local)
 	}
 

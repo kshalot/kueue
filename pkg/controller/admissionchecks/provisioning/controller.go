@@ -331,7 +331,7 @@ func (c *Controller) syncOwnedProvisionRequest(
 }
 
 func (c *Controller) handleError(ctx context.Context, wl *kueue.Workload, ac *kueue.AdmissionCheckState, msg string, err error) error {
-	c.record.Eventf(wl, corev1.EventTypeWarning, "FailedCreate", api.TruncateEventMessage(msg))
+	c.record.Eventf(wl, corev1.EventTypeWarning, "FailedCreate", "%s", api.TruncateEventMessage(msg))
 	patchErr := workload.PatchStatus(ctx, c.client, wl, kueue.ProvisioningRequestControllerName, func(wl *kueue.Workload) (bool, error) {
 		ac.Message = api.TruncateConditionMessage(msg)
 		ac.LastTransitionTime = metav1.NewTime(c.clock.Now())
