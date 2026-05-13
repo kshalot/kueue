@@ -442,6 +442,8 @@ type topologyAssignmentPodRequirements struct {
 	leaderRequests            *resources.Requests
 	assumedUsage              map[utiltas.TopologyDomainID]resources.Requests
 	tolerations               []corev1.Toleration
+	nodeSelector              map[string]string
+	affinity                  *corev1.Affinity
 	selector                  labels.Selector
 	affinitySelector          *nodeaffinity.NodeSelector
 	requiredReplacementDomain utiltas.TopologyDomainID
@@ -886,6 +888,8 @@ func (s *TASFlavorSnapshot) findTopologyAssignment(
 	}
 
 	requirements.tolerations = append(info.Tolerations, s.tolerations...)
+	requirements.nodeSelector = info.NodeSelector
+	requirements.affinity = info.Affinity
 
 	if s.isLowestLevelNode {
 		sel, err := labels.ValidatedSelectorFromSet(info.NodeSelector)
@@ -1597,6 +1601,10 @@ func (s *TASFlavorSnapshot) fillInCounts(requirements *topologyAssignmentPodRequ
 					Spec:       *requirements.podTemplate.Spec.DeepCopy(),
 				}
 				dummyPod.Spec.Tolerations = requirements.tolerations
+				dummyPod.Spec.NodeSelector = requirements.nodeSelector
+				dummyPod.Spec.Affinity = requirements.affinity
+
+				s.log.V(0).Info("WAS dummyPod nodeSelector", "domainID", leaf.id, "nodeSelector", dummyPod.Spec.NodeSelector, "nodeLabels", leaf.node.Labels)
 
 				feasibleNodes, err := s.wasSnapshot.CanSchedulePod(context.Background(), s.log, snapshot.SchedulablePod{
 					Pod:                dummyPod,
