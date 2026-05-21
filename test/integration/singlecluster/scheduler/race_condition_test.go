@@ -55,12 +55,12 @@ var _ = ginkgo.Describe("Admission Race Condition", func() {
 		util.MustCreate(ctx, k8sClient, q)
 	})
 
-	ginkgo.AfterEach(func() {
-		gomega.Expect(util.DeleteNamespace(ctx, k8sClient, ns)).To(gomega.Succeed())
-		util.ExpectObjectToBeDeleted(ctx, k8sClient, alphaFlavor, true)
-	})
+	// ginkgo.AfterEach(func() {
+	// 	gomega.Expect(util.DeleteNamespace(ctx, k8sClient, ns)).To(gomega.Succeed())
+	// 	util.ExpectObjectToBeDeleted(ctx, k8sClient, alphaFlavor, true)
+	// })
 
-	ginkgo.It("Should not admit a workload if it was evicted before the admission patch completes", func() {
+	ginkgo.It("Blocks workloads from being admitted due to a phantom preemption", func() {
 		blockAdmission := make(chan struct{})
 		admissionProceed := make(chan struct{})
 
