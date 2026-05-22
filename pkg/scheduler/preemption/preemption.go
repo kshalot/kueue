@@ -184,6 +184,11 @@ func preemptionMessage(preemptor *kueue.Workload, reason, preemptorPath, preempt
 	)
 }
 
+func (p *Preemptor) SatisfyPreemptionExpectation(log logr.Logger, wl *kueue.Workload) {
+	targetKey := types.NamespacedName{Name: wl.Name, Namespace: wl.Namespace}
+	p.preemptionExpectations.ObservedUID(log, targetKey, wl.UID)
+}
+
 // IssuePreemptions marks the target workloads as evicted.
 func (p *Preemptor) IssuePreemptions(
 	ctx context.Context,
@@ -236,6 +241,14 @@ func (p *Preemptor) IssuePreemptions(
 			preemptionErrors.Add(1)
 			return
 		}
+		// ARTIFICIAL RACE CONDITION TRIGGER: Trigger job1 admission patch and wait for it
+		schdcache.E2EMutex.Lock()
+		if schdcache.E2EPreemptionIssued != nil {
+			close(schdcache.E2EPreemptionIssued)
+			schdcache.E2EPreemptionIssued = nil
+		}
+		schdcache.E2EMutex.Unlock()
+
 		preemptorEffPri, preemptorBase, preemptorBoost := priorityInfo(log, preemptor.Obj)
 		targetEffPri, targetBase, targetBoost := priorityInfo(log, target.WorkloadInfo.Obj)
 		log.V(3).Info("Preempted", "targetWorkload", klog.KObj(target.WorkloadInfo.Obj), "preemptingWorkload", klog.KObj(preemptor.Obj), "preemptorUID", string(preemptor.Obj.UID),

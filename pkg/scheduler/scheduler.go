@@ -288,6 +288,9 @@ func (s *Scheduler) schedule(ctx context.Context) wait.SpeedSignal {
 	log := roletracker.WithReplicaRole(ctrl.LoggerFrom(ctx), s.roleTracker).WithValues("schedulingCycle", s.schedulingCycle)
 	ctx = ctrl.LoggerInto(ctx, log)
 	cycleStartTime := s.clock.Now()
+	if schdcache.E2EPreemptionIssued == nil && schdcache.E2EPreemptionDone != nil {
+		<-schdcache.E2EPreemptionDone
+	}
 	log.V(2).Info("Scheduling cycle starts")
 	defer func() {
 		log.V(2).Info("Scheduling cycle complete", "duration", s.clock.Since(cycleStartTime))
@@ -807,6 +810,9 @@ func (s *Scheduler) admit(ctx context.Context, e *entry, cq *schdcache.ClusterQu
 				log.V(5).Info("Clearing the topology assignment recovery field from the workload status after successful recovery")
 				wl.Status.UnhealthyNodes = nil
 			}
+			if schdcache.E2EPreemptionIssued != nil {
+				<-schdcache.E2EPreemptionIssued
+			}
 			return true, nil
 		}, workload.WithLooseOnApply(), workload.WithRetryOnConflictForPatch())
 		if err == nil {
@@ -817,6 +823,13 @@ func (s *Scheduler) admit(ctx context.Context, e *entry, cq *schdcache.ClusterQu
 			if features.Enabled(features.ElasticJobsViaWorkloadSlices) && oldWorkloadSlice != nil {
 				s.replaceOldWorkloadSlice(ctx, log, e, oldWorkloadSlice)
 			}
+			// time.Sleep(time.Second * 3)
+			schdcache.E2EMutex.Lock()
+			if schdcache.E2EPreemptionDone != nil {
+				close(schdcache.E2EPreemptionDone)
+				schdcache.E2EPreemptionDone = nil
+			}
+			schdcache.E2EMutex.Unlock()
 			return
 		}
 		// Ignore errors because the workload or clusterQueue could have been deleted

@@ -49,10 +49,13 @@ import (
 )
 
 var (
-	ErrCohortNotFound = errors.New("cohort not found")
-	ErrCohortHasCycle = errors.New("cohort has a cycle")
-	ErrCqNotFound     = errors.New("cluster queue not found")
-	errQNotFound      = errors.New("queue not found")
+	ErrCohortNotFound   = errors.New("cohort not found")
+	ErrCohortHasCycle   = errors.New("cohort has a cycle")
+	ErrCqNotFound       = errors.New("cluster queue not found")
+	errQNotFound        = errors.New("queue not found")
+	E2EMutex            sync.Mutex
+	E2EPreemptionIssued = make(chan struct{})
+	E2EPreemptionDone   = make(chan struct{})
 )
 
 const (

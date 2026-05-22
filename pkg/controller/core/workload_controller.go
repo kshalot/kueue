@@ -205,6 +205,7 @@ func (r *WorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Reconcile Workload")
+	log.V(2).Info("Workload status", "workload", wl.Status)
 
 	if len(wl.OwnerReferences) == 0 && !wl.DeletionTimestamp.IsZero() {
 		// manual deletion triggered by the user
