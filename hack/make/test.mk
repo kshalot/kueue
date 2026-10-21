@@ -376,13 +376,6 @@ test-e2e-was-tas-extended-helm: test-tas-e2e-extended-helm
 test-e2e-was-deep-tas-baseline: E2E_EXTRA_KUEUE_FEATURE_GATES=SchedulerLibraryIntegration=true,SchedulerLibraryDeepIntegration=true
 test-e2e-was-deep-tas-baseline: test-tas-e2e-baseline
 
-.PHONY: test-e2e-was-deep-tas-baseline-basic-fit
-test-e2e-was-deep-tas-baseline-basic-fit: GINKGO_ARGS=--label-filter="feature:tas-basic-fit"
-test-e2e-was-deep-tas-baseline-basic-fit: test-tas-e2e-deepintegration
-
-.PHONY: test-tas-e2e-deepintegration
-test-tas-e2e-deepintegration: setup-e2e-env run-test-tas-e2e-deepintegration-$(E2E_KIND_VERSION:kindest/node:v%=%)
-
 .PHONY: test-e2e-was-deep-tas-extended
 test-e2e-was-deep-tas-extended: E2E_EXTRA_KUEUE_FEATURE_GATES=SchedulerLibraryIntegration=true,SchedulerLibraryDeepIntegration=true,GenericWorkload=true
 test-e2e-was-deep-tas-extended: test-tas-e2e-extended
@@ -394,6 +387,10 @@ test-e2e-was-deep-tas-extended-shard-0: test-tas-e2e-extended-shard-0
 .PHONY: test-e2e-was-deep-tas-extended-shard-1
 test-e2e-was-deep-tas-extended-shard-1: E2E_EXTRA_KUEUE_FEATURE_GATES=SchedulerLibraryIntegration=true,SchedulerLibraryDeepIntegration=true,GenericWorkload=true
 test-e2e-was-deep-tas-extended-shard-1: test-tas-e2e-extended-shard-1
+
+.PHONY: test-tas-e2e-deepintegration
+test-tas-e2e-deepintegration: GINKGO_ARGS=--label-filter="feature:tas-basic-fit"
+test-tas-e2e-deepintegration: setup-e2e-env run-test-tas-e2e-deepintegration-$(E2E_KIND_VERSION:kindest/node:v%=%)
 
 # Backwards compatibility aliases for CI/Prow
 .PHONY: test-tas-was-e2e-baseline
